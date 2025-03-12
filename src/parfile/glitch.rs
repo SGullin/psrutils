@@ -1,4 +1,4 @@
-use super::{parse, ParParseError};
+use super::{parse_f64, ParParseError};
 
 #[derive(Debug, Default, Clone)]
 pub struct Glitch {
@@ -27,7 +27,7 @@ impl Glitch {
     /// there is no glitch 1, that produces a warning in the end of the `read`
     /// function. If there is not enough data to fully define a glitch, it is 
     /// removed and a warning is issued.
-    pub fn parse(parts: &[&str], glitches: &mut Vec<Glitch>) -> Result<bool, ParParseError> {
+    pub(crate) fn parse(parts: &[&str], glitches: &mut Vec<Glitch>) -> Result<bool, ParParseError> {
         let p0ps = parts[0].split("_").collect::<Vec<_>>();
         if p0ps.len() != 2 {
             return Ok(false);
@@ -37,8 +37,13 @@ impl Glitch {
             return Ok(false);
         }
         
-        let index = parse::<usize>(p0ps[1], "glitch index")?;
-        let value = parse::<f64>(parts[1], "double")?;
+        let index = p0ps[1]
+        .parse::<usize>()
+        .map_err(|_| ParParseError::Unparsable { 
+            value: p0ps[0].to_string(), 
+            to_type: "glitch index",
+        })?;
+        let value = parse_f64(parts[1])?;
 
         // Make sure there are glitches for all indicated slots...
         while glitches.len() <= index {

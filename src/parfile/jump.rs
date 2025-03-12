@@ -1,4 +1,4 @@
-use super::{parse, ParParseError};
+use super::{parse_bool, parse_f64, ParParseError};
 
 /// Add a constant oﬀset between specified TOAs.
 #[derive(Debug)]
@@ -20,7 +20,7 @@ pub enum JumpType {
 impl Jump {    
     /// This will parse a jump, which are written on one line. If anything is 
     /// missing or malformed, an error is returned.
-    pub fn parse(parts: &[&str], jumps: &mut Vec<Jump>) -> Result<bool, ParParseError> {
+    pub(crate) fn parse(parts: &[&str], jumps: &mut Vec<Jump>) -> Result<bool, ParParseError> {
         if parts[0] != "JUMP" {
             return Ok(false);
         }
@@ -34,12 +34,12 @@ impl Jump {
         let mut parts = parts.iter();
         let selector = match *parts.next().unwrap() {
             "MJD" => JumpType::MJD(
-                parse(parts.next().ok_or_else(error)?, "double")?,
-                parse(parts.next().ok_or_else(error)?, "double")?,
+                parse_f64(parts.next().ok_or_else(error)?)?,
+                parse_f64(parts.next().ok_or_else(error)?)?,
             ),
             "FREQ" => JumpType::FREQ(
-                parse(parts.next().ok_or_else(error)?, "double")?,
-                parse(parts.next().ok_or_else(error)?, "double")?,
+                parse_f64(parts.next().ok_or_else(error)?)?,
+                parse_f64(parts.next().ok_or_else(error)?)?,
             ),
             "TEL" => JumpType::TEL(parts.next().ok_or_else(error)?.to_string()),
             "NAME" => JumpType::NAME(parts.next().ok_or_else(error)?.to_string()),
@@ -52,8 +52,8 @@ impl Jump {
 
         let jump = Jump {
             selector,
-            value: parse(parts.next().ok_or_else(error)?, "double")?,
-            fit: parse(parts.next().ok_or_else(error)?, "bool")?,
+            value: parse_f64(parts.next().ok_or_else(error)?)?,
+            fit: parse_bool(parts.next().ok_or_else(error)?)?,
         };
         jumps.push(jump);
 

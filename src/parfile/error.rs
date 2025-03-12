@@ -30,6 +30,9 @@ pub enum ParParseError {
     RepeatPEpoch,
     RepeatPosition,
     RepeatDispersion,
+
+    BadFrequency,
+    BadPEpoch,
     
     DuplicateParameters(Vec<(String, String)>),
 }
@@ -87,6 +90,11 @@ impl std::fmt::Display for ParParseError {
                 => write!(f, "Repeated RA or DEC parameter."),
             ParParseError::RepeatDispersion
                 => write!(f, "Repeated DM parameter."),
+
+            ParParseError::BadPEpoch
+                => write!(f, "Bad PEPOCH parameter."),
+            ParParseError::BadFrequency
+                => write!(f, "Bad F0 parameter."),
 
             ParParseError::DuplicateParameters(items) 
                 => write!(

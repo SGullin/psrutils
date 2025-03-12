@@ -197,3 +197,10 @@ fn write_read_invariance() {
 
     assert_eq!(src, dst)
 }
+
+#[test]
+fn file() {
+    let f = include_bytes!("test.par");
+    let br = BufReader::new(f.as_slice());
+    let _ = Parfile::read(br).unwrap();
+}

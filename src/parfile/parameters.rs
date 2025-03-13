@@ -1,23 +1,14 @@
 use super::error::ParParseError;
-
-#[derive(Debug)]
-pub enum FittedParameter {
-    JustValue(f64),
-    FitInfo {
-        value: f64,
-        fit: bool,
-        error: f64,
-    }    
-}
+type Result<T> = std::result::Result<T, ParParseError>;
 
 #[derive(Debug, Default, PartialEq)]
-pub enum FittedCoord {
+pub enum FittedParameterValue<T> {
     #[default]
     Missing,
 
-    JustValue(i8, u8, f64),
+    JustValue(T),
     FitInfo {
-        value: (i8, u8, f64),
+        value: T,
         fit: bool,
         error: f64,
     }    
@@ -45,10 +36,11 @@ impl<T> Parameter<T> {
         }
     }
 }
-impl std::fmt::Display for Parameter<FittedParameter> {
+impl std::fmt::Display for Parameter<FittedParameterValue<f64>> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.value {
-            FittedParameter::FitInfo { value, fit, error } => write!(
+            FittedParameterValue::Missing => write!(f, "MISSING"),
+            FittedParameterValue::FitInfo { value, fit, error } => write!(
                 f,
                 "{} {} {} {}\n",
                 self.name,
@@ -56,15 +48,15 @@ impl std::fmt::Display for Parameter<FittedParameter> {
                 if fit {"1"} else {"0"},
                 error,
             ),
-            FittedParameter::JustValue(v) => write!(f, "{} {}\n", self.name, v),
+            FittedParameterValue::JustValue(v) => write!(f, "{} {}\n", self.name, v),
         }
     }
 }
-impl std::fmt::Display for Parameter<FittedCoord> {
+impl std::fmt::Display for Parameter<J2000Coord> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.value {
-            FittedCoord::Missing => write!(f, "MISSING PARAMETER"),
-            FittedCoord::FitInfo { value, fit, error } => write!(
+            FittedParameterValue::Missing => write!(f, "MISSING PARAMETER"),
+            FittedParameterValue::FitInfo { value, fit, error } => write!(
                 f,
                 "{} {}:{}:{} {} {}\n",
                 self.name,
@@ -72,26 +64,29 @@ impl std::fmt::Display for Parameter<FittedCoord> {
                 if fit {"1"} else {"0"},
                 error,
             ),
-            FittedCoord::JustValue(v1, v2, v3) 
+            FittedParameterValue::JustValue((v1, v2, v3)) 
                 => write!(f, "{} {}:{}:{}\n", self.name, v1, v2, v3),
         }
     }
 }
 
-pub(super) fn parse_coord(value: &str, parts: &[&str], is_ra: bool) -> Result<FittedCoord, ParParseError> {
+pub type FittedParameter = Parameter<FittedParameterValue<f64>>;
+pub type J2000Coord = FittedParameterValue<(i8, u8, f64)>;
+
+pub(super) fn parse_dec(
+    value: &str, 
+    parts: &[&str], 
+) -> Result<J2000Coord> {
     let coord_parts = value.split(":").collect::<Vec<_>>();
     if coord_parts.len() != 3 {
-        return Err( match is_ra {
-            true => ParParseError::InvalidRA(value.to_string()),
-            false => ParParseError::InvalidDec(value.to_string()),
-        });
+        return Err(ParParseError::InvalidDec(value.to_string()))
     }
     
-    let hrsdeg = coord_parts[0]
+    let degrees = coord_parts[0]
         .parse::<i8>()
         .map_err(|_| ParParseError::Unparsable { 
             value: coord_parts[0].to_string(), 
-            to_type: if is_ra {"hours [0, 24]"} else {"degrees [-90, 90]"}
+            to_type: "degrees [-90, 90]",
         })?;
     let minutes = coord_parts[1]
         .parse::<u8>()
@@ -101,54 +96,95 @@ pub(super) fn parse_coord(value: &str, parts: &[&str], is_ra: bool) -> Result<Fi
         })?;
     let seconds = parse_f64(coord_parts[2])?;
 
-    match is_ra {
-        true => 
-            if hrsdeg < 0 
-            || hrsdeg >= 24 
-            || minutes >= 60 
-            || seconds >= 60.0 {
-                return Err(ParParseError::InvalidRA(value.to_string()));
-            },
-        false => 
-            if hrsdeg < -90
-            || hrsdeg == -90 && (minutes > 0 || seconds > 0.0) 
-            || hrsdeg > 90 
-            || hrsdeg == 90 && (minutes > 0 || seconds > 0.0)
-            || minutes >= 60 
-            || seconds >= 60.0 {
-                return Err(ParParseError::InvalidRA(value.to_string()));
-            },
+    if degrees < -90
+    || degrees == -90 && (minutes > 0 || seconds > 0.0) 
+    || degrees > 90 
+    || degrees == 90 && (minutes > 0 || seconds > 0.0)
+    || minutes >= 60 
+    || seconds >= 60.0 {
+        return Err(ParParseError::InvalidRA(value.to_string()));
     }
 
     let fit_info = if parts.len() > 3 {
         let fit = parse_bool(&parts[2])?;
         let error = parse_f64(&parts[3])?;
-        FittedCoord::FitInfo { value: (hrsdeg, minutes, seconds), fit, error }
+        FittedParameterValue::FitInfo { value: (degrees, minutes, seconds), fit, error }
     } else {
-        FittedCoord::JustValue(hrsdeg, minutes, seconds)
+        FittedParameterValue::JustValue((degrees, minutes, seconds))
     };
 
     Ok(fit_info)
 }
 
-pub(super) fn parse_flag(flag: &str) -> Result<Parameter<()>, ParParseError> {
+pub(super) fn parse_ra(
+    value: &str, 
+    parts: &[&str], 
+) -> Result<J2000Coord> {
+    let coord_parts = value.split(":").collect::<Vec<_>>();
+    if coord_parts.len() != 3 {
+        return Err(ParParseError::InvalidRA(value.to_string()));
+    }
+    
+    let hours = coord_parts[0]
+        .parse::<i8>()
+        .map_err(|_| ParParseError::Unparsable { 
+            value: coord_parts[0].to_string(), 
+            to_type: "hours [0, 24]"
+        })?;
+    let minutes = coord_parts[1]
+        .parse::<u8>()
+        .map_err(|_| ParParseError::Unparsable { 
+            value: coord_parts[0].to_string(), 
+            to_type: "minutes",
+        })?;
+    let seconds = parse_f64(coord_parts[2])?;
 
-    todo!("should add y/n after flag read");
+    if hours >= 24 
+    || hours < 0 
+    || minutes >= 60 
+    || seconds >= 60.0 {
+        return Err(ParParseError::InvalidRA(value.to_string()));
+    }
 
-    FLAGS
+    let fit_info = if parts.len() > 3 {
+        let fit = parse_bool(&parts[2])?;
+        let error = parse_f64(&parts[3])?;
+        FittedParameterValue::FitInfo { value: (hours, minutes, seconds), fit, error }
+    } else {
+        FittedParameterValue::JustValue((hours, minutes, seconds))
+    };
+
+    Ok(fit_info)
+}
+
+pub(super) fn parse_flag(parts: &[&str]) -> Result<Option<Parameter<bool>>> {
+    let name = parts[0];
+    
+    let flag = FLAGS
         .iter()
-        .find(|f| f.0 == flag || f.1.contains(&flag))
+        .find(|p| p.0 == name || p.1.contains(&name))
         .map(|data| Parameter {
             name: data.0,
             description: data.2,
-            value: (),
-        })
-        .ok_or_else(|| ParParseError::UnknownFlag(flag.to_string()))
+            value: true,
+        });
+   
+    let mut flag = match flag {
+        Some(p) => p,
+        None => return Ok(None),
+    };
+
+    if parts.len() < 2 {
+        return Err(ParParseError::FlagMissingValue(name.to_string()));
+    }
+    flag.value = parse_bool(parts[1])?;
+
+    Ok(Some(flag))
 }
 
-pub(super) fn parse_param64(
+pub(super) fn parse_fitted(
     parts: &[&str],
-) -> Result<Option<Parameter<FittedParameter>>, ParParseError> {
+) -> Result<Option<FittedParameter>> {
     let name = parts[0];
     
     let param = PARAMETERS
@@ -157,7 +193,7 @@ pub(super) fn parse_param64(
         .map(|data| Parameter {
             name: data.0,
             description: data.2,
-            value: FittedParameter::JustValue(0.0),
+            value: FittedParameterValue::JustValue(0.0),
         });
 
     let mut param = match param {
@@ -170,30 +206,30 @@ pub(super) fn parse_param64(
     let fit_info = if parts.len() > 3 {
         let fit = parse_bool(&parts[2])?;
         let error = parse_f64(&parts[3])?;
-        FittedParameter::FitInfo { value, fit, error }
+        FittedParameterValue::FitInfo { value, fit, error }
     } else {
-        FittedParameter::JustValue(value)
+        FittedParameterValue::JustValue(value)
     };
     param.value = fit_info;
 
     Ok(Some(param))
 }
 
-pub(super) fn parse_f64(value: &str) -> Result<f64, ParParseError> {
+pub(super) fn parse_f64(value: &str) -> Result<f64> {
     value.parse()
         .map_err(|_| ParParseError::Unparsable { 
             value: value.to_string(), to_type: "double"
         })
 }
 
-pub(super) fn parse_u32(value: &str) -> Result<u32, ParParseError> {
+pub(super) fn parse_u32(value: &str) -> Result<u32> {
     value.parse()
         .map_err(|_| ParParseError::Unparsable { 
             value: value.to_string(), to_type: "integer"
         })
 }
 
-pub(super) fn parse_bool(value: &str) -> Result<bool, ParParseError> {
+pub(super) fn parse_bool(value: &str) -> Result<bool> {
     match value {
         "1" | "Y" => Ok(true),
         "0" | "N "=> Ok(false),

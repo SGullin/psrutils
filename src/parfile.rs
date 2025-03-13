@@ -68,14 +68,14 @@ pub enum Units {
 #[derive(Debug, Default)]
 pub struct Parfile {
     /// J2000 right ascension (hh:mm:ss.sss)
-    ra: Parameter<FittedCoord>,
+    ra: Parameter<J2000Coord>,
     /// J2000 declination (dd:mm:ss.sss)
-    dec: Parameter<FittedCoord>,
+    dec: Parameter<J2000Coord>,
 
-    parameters: Vec<Parameter<FittedParameter>>,
+    parameters: Vec<FittedParameter>,
     counts: Vec<Parameter<u32>>,
     texts: Vec<Parameter<String>>,
-    flags: Vec<Parameter<()>>,
+    flags: Vec<Parameter<bool>>,
 
     /// Glitches, if any
     glitches: Vec<Glitch>,
@@ -217,18 +217,15 @@ impl Parfile {
     fn parse_line(&mut self, line: &str) -> Result<(), ParParseError> {
         let parts = line.split_whitespace().collect::<Vec<_>>();
 
-        if parts.len() == 1 {
-            // Must be a flag
-            self.flags.push(parse_flag(&parts[0])?);
-            return Ok(());
-        }
-
         if Glitch::parse(&parts, &mut self.glitches)? { return Ok(()); }
         if Jump::parse(&parts, &mut self.jumps)? { return Ok(()); }
         if self.parse_special(&parts)? { return Ok(()); }
 
-        if let Some(param) = parse_param64(&parts)? {
-            // Must be a fit value
+        if let Some(flag) = parse_flag(&parts)? {
+            self.flags.push(flag);
+            return Ok(());
+        }
+        if let Some(param) = parse_fitted(&parts)? {
             self.parameters.push(param);
             return Ok(());
         }
@@ -267,25 +264,26 @@ impl Parfile {
 
         // Coords
         if COORDS[0].1.contains(&key) {
-            if *self.ra.value() != FittedCoord::Missing {
+            if *self.ra.value() != FittedParameterValue::Missing {
                 return Err(ParParseError::RepeatPosition);
             }
 
             self.ra = Parameter::new(
                 &COORDS[0],
-                parse_coord(value, parts, true)?,
+                // parse_coord(value, parts, true)?,
+                parse_ra(value, parts)?,
             );
             
             return Ok(true);
         }
         if COORDS[1].1.contains(&key) {
-            if *self.dec.value() != FittedCoord::Missing { 
+            if *self.dec.value() != FittedParameterValue::Missing { 
                 return Err(ParParseError::RepeatPosition);
             }
             
             self.dec = Parameter::new(
                 &COORDS[1],
-                parse_coord(value, parts, false)?,
+                parse_dec(value, parts)?,
             );
             
             return Ok(true);
@@ -349,8 +347,9 @@ impl Parfile {
     /// Performs a little check to see everything's ok.
     fn check(&mut self) -> Result<(), ParParseError> {
         // Check mandatory params
-        if *self.ra.value() == FittedCoord::Missing 
-        || *self.dec.value() == FittedCoord::Missing {
+        // if *self.ra.value() == FittedCoord::Missing 
+        if *self.ra.value() == FittedParameterValue::Missing 
+        || *self.dec.value() == FittedParameterValue::Missing {
             return Err(ParParseError::NoPosition);
         }
         if self.texts
@@ -364,8 +363,9 @@ impl Parfile {
             .find(|t| t.name() == "PEPOCH")
             .map(|p| 
                 if match *p.value() {
-                    FittedParameter::JustValue(v) => v > 0.0,
-                    FittedParameter::FitInfo { value, .. } => value > 0.0,
+                    FittedParameterValue::Missing => false,
+                    FittedParameterValue::JustValue(v) => v > 0.0,
+                    FittedParameterValue::FitInfo { value, .. } => value > 0.0,
                 }{ Ok(()) } else { Err(ParParseError::BadPEpoch) }
             )
             .unwrap_or(Err(ParParseError::NoPEpoch))?;
@@ -375,8 +375,9 @@ impl Parfile {
             .find(|t| t.name() == "F0")
             .map(|p| 
                 if match *p.value() {
-                    FittedParameter::JustValue(v) => v > 0.0,
-                    FittedParameter::FitInfo { value, .. } => value > 0.0,
+                    FittedParameterValue::Missing => false,
+                    FittedParameterValue::JustValue(v) => v > 0.0,
+                    FittedParameterValue::FitInfo { value, .. } => value > 0.0,
                 } { Ok(()) } else { Err(ParParseError::BadFrequency) }
             )
             .unwrap_or(Err(ParParseError::NoFrequency))?;

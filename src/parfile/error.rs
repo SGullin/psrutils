@@ -7,6 +7,7 @@ pub enum ParParseError {
     
     InvalidRA(String),
     InvalidDec(String),
+    FlagMissingValue(String),
     
     UnknownFlag(String),
     UnrecognisedKey(String),
@@ -48,6 +49,8 @@ impl std::fmt::Display for ParParseError {
                 => write!(f, "Invalid RA string '{}'.", ra),
             ParParseError::InvalidDec(dec) 
                 => write!(f, "Invalid DEC string '{}'.", dec),
+            ParParseError::FlagMissingValue(flag) 
+                => write!(f, "Flag '{}' missing Y/N value.", flag),
 
             ParParseError::UnknownFlag(flag) 
                 => write!(f, "Unknown flag '{}'.", flag),

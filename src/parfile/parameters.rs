@@ -157,6 +157,39 @@ pub(super) fn parse_ra(
     Ok(fit_info)
 }
 
+pub(super) fn parse_fitted(
+    parts: &[&str],
+) -> Result<Option<FittedParameter>> {
+    let name = parts[0];
+    
+    let param = PARAMETERS
+    .iter()
+    .find(|p| p.0 == name || p.1.contains(&name))
+    .map(|data| Parameter {
+        name: data.0,
+        description: data.2,
+        value: FittedParameterValue::JustValue(0.0),
+    });
+    
+    let mut param = match param {
+        Some(p) => p,
+        None => return Ok(None),
+    };
+    
+    let value = parse_f64(&parts[1])?;
+    
+    let fit_info = if parts.len() > 3 {
+        let fit = parse_bool(&parts[2])?;
+        let error = parse_f64(&parts[3])?;
+        FittedParameterValue::FitInfo { value, fit, error }
+    } else {
+        FittedParameterValue::JustValue(value)
+    };
+    param.value = fit_info;
+    
+    Ok(Some(param))
+}
+
 pub(super) fn parse_flag(parts: &[&str]) -> Result<Option<Parameter<bool>>> {
     let name = parts[0];
     
@@ -174,45 +207,34 @@ pub(super) fn parse_flag(parts: &[&str]) -> Result<Option<Parameter<bool>>> {
         None => return Ok(None),
     };
 
-    if parts.len() < 2 {
-        return Err(ParParseError::FlagMissingValue(name.to_string()));
-    }
     flag.value = parse_bool(parts[1])?;
 
     Ok(Some(flag))
 }
 
-pub(super) fn parse_fitted(
-    parts: &[&str],
-) -> Result<Option<FittedParameter>> {
-    let name = parts[0];
-    
-    let param = PARAMETERS
+pub(super) fn parse_count(parts: &[&str]) -> Result<Option<Parameter<u32>>> {
+    let key = parts[0];
+    let value = parts[1];
+    let p32 = PARAMETERS_U32
         .iter()
-        .find(|p| p.0 == name || p.1.contains(&name))
-        .map(|data| Parameter {
-            name: data.0,
-            description: data.2,
-            value: FittedParameterValue::JustValue(0.0),
-        });
-
-    let mut param = match param {
-        Some(p) => p,
-        None => return Ok(None),
-    };
+        .find(|p| p.0 == key || p.1.contains(&key));
     
-    let value = parse_f64(&parts[1])?;
+    if let Some(data) = p32 {
+        let value = parse_u32(value)?;
+        return Ok(Some(Parameter::new(data, value)));
+    }
+    Ok(None)
+}
 
-    let fit_info = if parts.len() > 3 {
-        let fit = parse_bool(&parts[2])?;
-        let error = parse_f64(&parts[3])?;
-        FittedParameterValue::FitInfo { value, fit, error }
-    } else {
-        FittedParameterValue::JustValue(value)
-    };
-    param.value = fit_info;
+pub(super) fn parse_text(parts: &[&str]) -> Result<Option<Parameter<String>>> {
+    let key = parts[0];
+    let value = parts[1];
 
-    Ok(Some(param))
+    TEXTS
+        .iter()
+        .find(|t| t.0 == key || t.1.contains(&key))
+        .map(|data| Some(Parameter::new(data, value.to_string())))
+        .ok_or_else(|| ParParseError::UnrecognisedKey(key.to_string()))
 }
 
 pub(super) fn parse_f64(value: &str) -> Result<f64> {
@@ -231,8 +253,8 @@ pub(super) fn parse_u32(value: &str) -> Result<u32> {
 
 pub(super) fn parse_bool(value: &str) -> Result<bool> {
     match value {
-        "1" | "Y" => Ok(true),
-        "0" | "N "=> Ok(false),
+        "1" | "Y" | "y" => Ok(true),
+        "0" | "N" | "n" => Ok(false),
         _ => Err(ParParseError::Unparsable { 
             value: value.to_string(), to_type: "bool" 
         })
@@ -318,6 +340,7 @@ pub(crate) const PARAMETERS: &[(&str, &[&str], &str)] = &[
     ("SHAPMAX", &[],            "Missing info"),
     ("MTOT", &[],               "Total system mass solar masses"),
     ("NE_SW", &[],              "Encountered in the wild"),
+    ("CHI2R", &[],              "Encountered in the wild"),
     // No info so far on what these are...
     // ("BPJEP", &[],     "Missing info"),
     // ("BPJPH", &[],     "Missing info"),
@@ -331,6 +354,7 @@ pub(crate) const PARAMETERS: &[(&str, &[&str], &str)] = &[
 pub(crate) const PARAMETERS_U32: &[(&str, &[&str], &str)] = &[
     ("NITS", &[],  "Number of iterations for the fitting routines"),
     ("IBOOT", &[], "Number of iterations used in the bootstrap fitting method"),
+    ("NTOA", &[],  "Number of TOAs"),
 ];
 
 /// All documented parfile parameters with String values.

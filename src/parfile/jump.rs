@@ -32,6 +32,7 @@ impl Jump {
         }
 
         let mut parts = parts.iter();
+        _ = parts.next();
         let selector = match *parts.next().unwrap() {
             "MJD" => JumpType::MJD(
                 parse_f64(parts.next().ok_or_else(error)?)?,

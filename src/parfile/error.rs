@@ -7,7 +7,7 @@ pub enum ParParseError {
     
     InvalidRA(String),
     InvalidDec(String),
-    FlagMissingValue(String),
+    MissingValue(String),
     
     UnknownFlag(String),
     UnrecognisedKey(String),
@@ -23,19 +23,13 @@ pub enum ParParseError {
     NoName,
     NoFrequency,
     NoPEpoch,
-    NoPosition,
     NoDispersion,
-
-    RepeatName,
-    RepeatFrequency,
-    RepeatPEpoch,
-    RepeatPosition,
-    RepeatDispersion,
 
     BadFrequency,
     BadPEpoch,
     
     DuplicateParameters(Vec<(String, String)>),
+    RepeatParam(String),
 }
 impl std::fmt::Display for ParParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -49,8 +43,8 @@ impl std::fmt::Display for ParParseError {
                 => write!(f, "Invalid RA string '{}'.", ra),
             ParParseError::InvalidDec(dec) 
                 => write!(f, "Invalid DEC string '{}'.", dec),
-            ParParseError::FlagMissingValue(flag) 
-                => write!(f, "Flag '{}' missing Y/N value.", flag),
+            ParParseError::MissingValue(p) 
+                => write!(f, "Param '{}' missing value.", p),
 
             ParParseError::UnknownFlag(flag) 
                 => write!(f, "Unknown flag '{}'.", flag),
@@ -78,21 +72,8 @@ impl std::fmt::Display for ParParseError {
                 => write!(f, "Missing F0 parameter."),
             ParParseError::NoPEpoch 
                 => write!(f, "Missing PEPOCH parameter."),
-            ParParseError::NoPosition 
-                => write!(f, "Missing RA or DEC parameter."),
             ParParseError::NoDispersion
                 => write!(f, "Missing DM parameter."),
-
-            ParParseError::RepeatName 
-                => write!(f, "Repeated PSR parameter."),
-            ParParseError::RepeatFrequency 
-                => write!(f, "Repeated F0 parameter."),
-            ParParseError::RepeatPEpoch
-                => write!(f, "Repeated PEPOCH parameter."),
-            ParParseError::RepeatPosition
-                => write!(f, "Repeated RA or DEC parameter."),
-            ParParseError::RepeatDispersion
-                => write!(f, "Repeated DM parameter."),
 
             ParParseError::BadPEpoch
                 => write!(f, "Bad PEPOCH parameter."),
@@ -107,6 +88,9 @@ impl std::fmt::Display for ParParseError {
                         .fold(String::new(), |a, (l1, l2)| 
                             format!("{}\n * '{}' and '{}'", a, l1, l2))
                         ),
+            
+            ParParseError::RepeatParam(param)
+                => write!(f, "Repeated '{}' parameter.", param),
         }
     }
 }

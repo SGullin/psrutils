@@ -6,15 +6,15 @@ use super::*;
 #[test]
 fn incomplete_parinfo() {
     let minimal = [
-        "PSR J0000-9999\n",
         "RA 23:59:59.999\n",
         "DEC 359:59:59.999\n",
+        "PSR J0000-9999\n",
         "PEPOCH 55000\n",
         "F0 9001\n",
         "DM 99\n",
     ];
 
-    for i in 0..6 {
+    for i in 2..6 {
         let subset = minimal
             .iter()
             .enumerate()
@@ -180,7 +180,7 @@ fn write_read_invariance() {
         F1      -0.02\n\
         MODE 1\n\
         MODEL   BT\n\
-        NOTRACK\n\
+        NOTRACK y\n\
         NITS    1000\n\
         DM_SERIES   TAYLOR\n\
     ";

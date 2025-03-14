@@ -58,39 +58,50 @@ pub enum Units {
 /// Complete representation of a loaded .par file.
 /// 
 /// It follows the loose standards of TEMPO2, and as such is guaranteed to have
-/// values for `PSR`, `RA`, `DEC`, `F0`, `PEPOCH`, and `DM`. Some particular
-/// parameters (e.g. `units`) are _not_ given default values when absent from
-/// a loaded file, rather, they are set to `Unstated`. 
+/// values for `PSR`, `F0`, `PEPOCH`, and `DM`. Some particular parameters 
+/// (e.g. `units`) are _not_ given default values when absent from a loaded 
+/// file, rather, they are set to `Unstated`. 
 /// 
 /// Glitches and jumps are stored in vectors. Since glitches are multi-line
 /// parameters, they are kept track of with indices (e.g. `GLEP_1`) and 
 /// disjunct ranges are considered erroneous.
+/// 
+/// All fields are public, since it is essentially just a datafile. There is,
+/// however, a check of all values performed before writing. A failure in this
+/// results in an error and no write.
 #[derive(Debug, Default)]
 pub struct Parfile {
     /// J2000 right ascension (hh:mm:ss.sss)
-    ra: Parameter<J2000Coord>,
+    pub ra: Parameter<J2000Coord>,
     /// J2000 declination (dd:mm:ss.sss)
-    dec: Parameter<J2000Coord>,
+    pub dec: Parameter<J2000Coord>,
 
-    parameters: Vec<FittedParameter>,
-    counts: Vec<Parameter<u32>>,
-    texts: Vec<Parameter<String>>,
-    flags: Vec<Parameter<bool>>,
+    /// All double precision parameters, and optional data on whether to fit 
+    /// them, with errors. See `FittedParameter` for more info.
+    pub parameters: Vec<FittedParameter>,
+    /// All integer parameters.
+    pub counts: Vec<Parameter<u32>>,
+    /// All text parameters.
+    pub texts: Vec<Parameter<String>>,
+    /// All boolean flags.
+    pub flags: Vec<Parameter<bool>>,
 
     /// Glitches, if any
-    glitches: Vec<Glitch>,
+    pub glitches: Vec<Glitch>,
     /// Jumps, if any
-    jumps: Vec<Jump>,
+    pub jumps: Vec<Jump>,
 
     /// Which time ephemeris to use
-    time_eph: TimeEphemeris, 
+    pub time_eph: TimeEphemeris, 
     /// Binary model
-    binary_model: BinaryModel,
+    pub binary_model: BinaryModel,
     /// Method for transforming from terrestrial to celestial frame 
-    t2c_method: T2CMethod,
+    pub t2c_method: T2CMethod,
 
-    units: Units,
-    error_mode: ErrorMode,
+    /// What units to use.
+    pub units: Units,
+    /// Which error mode to use.
+    pub error_mode: ErrorMode,
 }
 
 impl Parfile {
@@ -120,6 +131,8 @@ impl Parfile {
     /// Note that the order of parameters and whitespace may differ from any
     /// input file used to construct it, but will be consistent.
     pub fn write(&self, writer: &mut impl Write) -> Result<(), ParParseError> {
+        self.check()?;
+
         // It's nice to put the name up top, even though it is a regular text
         // parameter... so we extract it here.
         let name_index = self.texts
@@ -162,7 +175,14 @@ impl Parfile {
 
         // Flags
         for parameter in &self.flags {
-            let line =  format!("{}\n", parameter.name());
+            let line =  format!(
+                "{} {}", 
+                parameter.name(), 
+                match parameter.value() {
+                    true => "Y\n",
+                    false => "N\n",
+                }
+            );
             writer.write(line.as_bytes()).map_err(ParParseError::IOError)?;
         }
 
@@ -216,6 +236,9 @@ impl Parfile {
 
     fn parse_line(&mut self, line: &str) -> Result<(), ParParseError> {
         let parts = line.split_whitespace().collect::<Vec<_>>();
+        if parts.len() < 2 {
+            return Err(ParParseError::MissingValue(parts[0].to_string()));
+        }
 
         if Glitch::parse(&parts, &mut self.glitches)? { return Ok(()); }
         if Jump::parse(&parts, &mut self.jumps)? { return Ok(()); }
@@ -229,26 +252,14 @@ impl Parfile {
             self.parameters.push(param);
             return Ok(());
         }
-
-        // Else must be either u32 or text parameter
-        let key = parts[0];
-        let value = parts[1];
-        let p32 = PARAMETERS_U32
-            .iter()
-            .find(|p| p.0 == key || p.1.contains(&key));
-
-        if let Some(data) = p32 {
-            let value = parse_u32(value)?;
-            self.counts.push(Parameter::new(data, value));
+        if let Some(param) = parse_count(&parts)? {
+            self.counts.push(param);
             return Ok(());
         }
-
-        let data = TEXTS
-            .iter()
-            .find(|t| t.0 == key || t.1.contains(&key))
-            .ok_or_else(|| ParParseError::UnrecognisedKey(key.to_string()))?;
-        
-        self.texts.push(Parameter::new(data, value.to_string()));
+        if let Some(param) = parse_text(&parts)? {
+            self.texts.push(param);
+            return Ok(());
+        }
 
         Ok(())
     }
@@ -260,17 +271,14 @@ impl Parfile {
         let key = parts[0];
         let value = parts[1];
 
-        println!("Spec: '{}' '{}'", key, value);
-
         // Coords
         if COORDS[0].1.contains(&key) {
             if *self.ra.value() != FittedParameterValue::Missing {
-                return Err(ParParseError::RepeatPosition);
+                return Err(ParParseError::RepeatParam(COORDS[0].0.to_string()));
             }
 
             self.ra = Parameter::new(
                 &COORDS[0],
-                // parse_coord(value, parts, true)?,
                 parse_ra(value, parts)?,
             );
             
@@ -278,7 +286,7 @@ impl Parfile {
         }
         if COORDS[1].1.contains(&key) {
             if *self.dec.value() != FittedParameterValue::Missing { 
-                return Err(ParParseError::RepeatPosition);
+                return Err(ParParseError::RepeatParam(COORDS[1].0.to_string()));
             }
             
             self.dec = Parameter::new(
@@ -291,6 +299,9 @@ impl Parfile {
 
         // Which time ephemeris to use (IF99/FB90)
         if "TIMEEPH" == key {
+            if self.time_eph != TimeEphemeris::Unstated {
+                return Err(ParParseError::RepeatParam(String::from("TIMEEPH")))
+            }
             self.time_eph = match value {
                 "IF99" => TimeEphemeris::IF99,
                 "FB90" => TimeEphemeris::FB90,
@@ -301,6 +312,9 @@ impl Parfile {
 
         // Binary model
         if "MODEL" == key {
+            if self.binary_model != BinaryModel::Unstated {
+                return Err(ParParseError::RepeatParam(String::from("MODEL")))
+            }
             self.binary_model = match value {
                 "BT" => BinaryModel::BT,
                 "DD" => BinaryModel::DD,
@@ -313,6 +327,9 @@ impl Parfile {
 
         // Method for transforming from terrestrial to celestial frame 
         if "T2CMETHOD" == key {
+            if self.t2c_method != T2CMethod::Unstated {
+                return Err(ParParseError::RepeatParam(String::from("T2CMETHOD")))
+            }
             self.t2c_method = match value {
                 "TEMPO" => T2CMethod::TEMPO,
                 "IAU2000B" => T2CMethod::IAU2000B,
@@ -323,6 +340,9 @@ impl Parfile {
 
         // Units
         if "UNITS" == key {
+            if self.units != Units::Unstated {
+                return Err(ParParseError::RepeatParam(String::from("UNITS")))
+            }
             self.units = match value {
                 "SI" => Units::SI,
                 "TCB" => Units::TCB,
@@ -333,6 +353,9 @@ impl Parfile {
         }
 
         if "MODE" == key {
+            if self.error_mode != ErrorMode::Unstated {
+                return Err(ParParseError::RepeatParam(String::from("MODE")))
+            }
             self.error_mode = match value {
                 "0" => ErrorMode::Mode0,
                 "1" => ErrorMode::Mode1,
@@ -345,13 +368,8 @@ impl Parfile {
     }
     
     /// Performs a little check to see everything's ok.
-    fn check(&mut self) -> Result<(), ParParseError> {
+    fn check(&self) -> Result<(), ParParseError> {
         // Check mandatory params
-        // if *self.ra.value() == FittedCoord::Missing 
-        if *self.ra.value() == FittedParameterValue::Missing 
-        || *self.dec.value() == FittedParameterValue::Missing {
-            return Err(ParParseError::NoPosition);
-        }
         if self.texts
             .iter()
             .find(|t| t.name() == "PSR")

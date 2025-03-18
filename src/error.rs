@@ -33,10 +33,10 @@ pub enum PsruError {
     ParRepeatParam(String),
 
     // Tim errors ---------------------------------
-    TimNotFormat1,
-    TimUnexpectedEOL,
-    TimMalformedMJD,
-    TimUnvaluedFlag(String),
+    TimNotFormat1(Option<TimContext>),
+    TimUnexpectedEOL(Option<TimContext>),
+    TimMalformedMJD(Option<TimContext>),
+    TimUnvaluedFlag(Option<TimContext>, String),
 }
 impl std::fmt::Display for PsruError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -100,16 +100,63 @@ impl std::fmt::Display for PsruError {
                 => write!(f, "Repeated '{}' parameter.", param),
 
             
-            PsruError::TimNotFormat1 => write!(f, 
-                "Currently only TEMPO2 format (FORMAT 1) is supported."),
-            PsruError::TimUnexpectedEOL => write!(f, 
-                "TOA line ended prematurely"),
-            PsruError::TimMalformedMJD => write!(f,
-                "MJD is expected to be in decimal format."),
-            PsruError::TimUnvaluedFlag(flag) => write!(f,
-                "Flag '{}' did not have a value.", flag),
+            PsruError::TimNotFormat1(ctx) => write!(f, 
+                "{} Currently only TEMPO2 format (FORMAT 1) is supported.",
+                tim_ctx(ctx)),
+            PsruError::TimUnexpectedEOL(ctx) => write!(f, 
+                "{} TOA line ended prematurely",
+                tim_ctx(ctx)),
+            PsruError::TimMalformedMJD(ctx) => write!(f,
+                "{} MJD is expected to be in decimal format.",
+                tim_ctx(ctx)),
+            PsruError::TimUnvaluedFlag(ctx, flag) => write!(f,
+                "{} Flag '{}' did not have a value.", 
+                tim_ctx(ctx), flag),
         }
+    }
+}
+impl PsruError {
+    pub fn set_tim_ctx(mut self, ctx: &TimContext) -> PsruError {
+        let old_ctx = match &mut self {
+            PsruError::TimNotFormat1(ctx) => ctx,
+            PsruError::TimUnexpectedEOL(ctx) => ctx,
+            PsruError::TimMalformedMJD(ctx) => ctx,
+            PsruError::TimUnvaluedFlag(ctx, _) => ctx,
+            _ => return self,
+        };
+
+        if old_ctx.is_none() {
+            *old_ctx = Some(ctx.clone());
+        }
+
+        self
     }
 }
 
 impl Error for PsruError {}
+
+#[derive(Debug, Clone)]
+pub struct TimContext {
+    fname: String,
+    line: usize,
+}
+impl TimContext {
+    pub(crate) fn new(fname: &str, line_number: usize) -> Self {
+        Self { fname: fname.to_string(), line: line_number }
+    }
+    pub(crate) fn line(&mut self, number: usize) {
+        self.line = number;
+    }
+}
+impl std::fmt::Display for TimContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "In file '{}' on line {}:", self.fname, self.line)
+    }
+}
+
+fn tim_ctx(ctx: &Option<TimContext>) -> String {
+    match ctx {
+        Some(ctx) => ctx.to_string(),
+        None => String::new(),
+    }
+}

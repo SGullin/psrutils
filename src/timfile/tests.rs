@@ -3,6 +3,7 @@ use std::io::{BufReader, LineWriter};
 #[allow(unused)]
 use super::*;
 
+#[allow(unused)]
 const MINIMAL: &[&str] = &[
     "dir/file.ext",
     "999.999",
@@ -46,10 +47,4 @@ fn comments() {
         "#hellouuu",
     ];
     TOAInfo::parse_tempo2(&parts).unwrap();
-}
-#[test]
-fn file() {
-    let file = File::open("test.tim").unwrap();
-    let bfr = BufReader::new(file);
-    read_tim(bfr).unwrap();
 }

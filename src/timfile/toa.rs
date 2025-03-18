@@ -20,44 +20,51 @@ pub struct TOAInfo {
 impl TOAInfo {
     pub(crate) fn parse_tempo2(parts: &[&str]) -> Result<Self, PsruError> {
         let is_bad = parts[0] == "c" || parts[0] == "C";
-        let (comments, values): (Vec<&str>, Vec<&str>) = parts
+        let (mut comments, mut values): (Vec<&str>, Vec<&str>) = parts
             .iter()
-            .partition(|w| w.starts_with("#"));
+            .partition(|w| w.starts_with("#") && w.len() > 1);
+        
+        if let Some(pos) = values.iter().position(|w| *w == "#") {
+            values
+                .split_off(pos)[1..]
+                .iter()
+                .for_each(|c| comments.push(c));
+        }
+        
         let comment = comments.join(" -- ");
-
         let mut values = values.into_iter();
 
         if is_bad { _ = values.next(); }
 
         let file = values
             .next()
-            .ok_or(PsruError::TimUnexpectedEOL)?
+            .ok_or(PsruError::TimUnexpectedEOL(None))?
             .to_string();
         
         let freq_text = values
             .next()
-            .ok_or(PsruError::TimUnexpectedEOL)?;
+            .ok_or(PsruError::TimUnexpectedEOL(None))?;
         let frequency = parse_f64(&freq_text)?;
 
         let mjd_text = values
             .next()
-            .ok_or(PsruError::TimUnexpectedEOL)?
+            .ok_or(PsruError::TimUnexpectedEOL(None))?
             .split(".")
             .collect::<Vec<_>>();
         if mjd_text.len() != 2 {
-            return Err(PsruError::TimMalformedMJD);
+            return Err(PsruError::TimMalformedMJD(None));
         }
         let mjd_int = parse_u32(mjd_text[0])?;
         let mjd_frac = parse_f64(&format!("0.{}", mjd_text[1]))?;
 
         let err_text = values
             .next()
-            .ok_or(PsruError::TimUnexpectedEOL)?;
+            .ok_or(PsruError::TimUnexpectedEOL(None))?;
         let error = parse_f64(&err_text)?;
 
         let site_id = values
             .next()
-            .ok_or(PsruError::TimUnexpectedEOL)?
+            .ok_or(PsruError::TimUnexpectedEOL(None))?
             .to_string();
 
         println!(
@@ -74,6 +81,7 @@ impl TOAInfo {
         let chunks = remains.chunks_exact(2);
         if !chunks.remainder().is_empty() {
             return Err(PsruError::TimUnvaluedFlag(
+                None,
                 chunks.remainder()[0].to_string()
             ));
         }

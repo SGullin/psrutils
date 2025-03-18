@@ -3,5 +3,11 @@ name = "psrutils"
 version = "0.1.0"
 edition = "2024"
 authors = ["Samuel Gullin <gullin@ia.forth.gr>"]
+license = "MIT OR Apache-2.0"
+description = "A crate with a few utilities to facilitate pulsar science projects in rust."
+repository = "https://github.com/SGullin/psrutils"
+readme = "readme.md"
+keywords = ["astronomy", "pulsars"]
+categories = ["data-structures", "science", "parsing"]
 
 [dependencies]

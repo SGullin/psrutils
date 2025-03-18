@@ -1,4 +1,6 @@
-use super::{parse_bool, parse_f64, ParParseError};
+use super::PsruError;
+use crate::parse_tools::parse_f64;
+use crate::parse_tools::parse_bool;
 
 /// Add a constant oﬀset between specified TOAs.
 #[derive(Debug)]
@@ -20,13 +22,13 @@ pub enum JumpType {
 impl Jump {    
     /// This will parse a jump, which are written on one line. If anything is 
     /// missing or malformed, an error is returned.
-    pub(crate) fn parse(parts: &[&str], jumps: &mut Vec<Jump>) -> Result<bool, ParParseError> {
+    pub(crate) fn parse(parts: &[&str], jumps: &mut Vec<Jump>) -> Result<bool, PsruError> {
         if parts[0] != "JUMP" {
             return Ok(false);
         }
 
         let es = parts.join(" ");
-        let error = || ParParseError::IncompleteJump(es.clone());
+        let error = || PsruError::IncompleteJump(es.clone());
         if parts.len() < 3 {
             return Err(error());
         }

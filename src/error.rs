@@ -1,16 +1,17 @@
 use std::error::Error;
 
 #[derive(Debug)]
-pub enum ParParseError {
+pub enum PsruError {
     Unparsable{ value: String, to_type: &'static str },
     IOError(std::io::Error),
     
+    // Par errors ---------------------------------
     InvalidRA(String),
     InvalidDec(String),
-    MissingValue(String),
+    ParMissingValue(String),
     
-    UnknownFlag(String),
-    UnrecognisedKey(String),
+    ParUnknownFlag(String),
+    ParUnrecognisedKey(String),
     UnknownBinaryModel(String),
     UnknownTimeEphemeris(String),
     UnknownT2CMethod(String),
@@ -20,67 +21,73 @@ pub enum ParParseError {
     IncompleteJump(String),
     BadGlitch(usize),
 
-    NoName,
-    NoFrequency,
-    NoPEpoch,
-    NoDispersion,
+    ParNoName,
+    ParNoFrequency,
+    ParNoPEpoch,
+    ParNoDispersion,
 
-    BadFrequency,
-    BadPEpoch,
+    ParBadFrequency,
+    ParBadPEpoch,
     
-    DuplicateParameters(Vec<(String, String)>),
-    RepeatParam(String),
+    ParDuplicateParameters(Vec<(String, String)>),
+    ParRepeatParam(String),
+
+    // Tim errors ---------------------------------
+    TimNotFormat1,
+    TimUnexpectedEOL,
+    TimMalformedMJD,
+    TimUnvaluedFlag(String),
 }
-impl std::fmt::Display for ParParseError {
+impl std::fmt::Display for PsruError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ParParseError::Unparsable { value, to_type } 
+            PsruError::Unparsable { value, to_type } 
                 => write!(f, "Impossible to parse '{}' into type {}.", value, to_type),
-            ParParseError::IOError(error) 
+            PsruError::IOError(error) 
                 => write!(f, "IO error >> {}", error),
 
-            ParParseError::InvalidRA(ra) 
+            PsruError::InvalidRA(ra) 
                 => write!(f, "Invalid RA string '{}'.", ra),
-            ParParseError::InvalidDec(dec) 
+            PsruError::InvalidDec(dec) 
                 => write!(f, "Invalid DEC string '{}'.", dec),
-            ParParseError::MissingValue(p) 
+            PsruError::ParMissingValue(p) 
                 => write!(f, "Param '{}' missing value.", p),
 
-            ParParseError::UnknownFlag(flag) 
+            PsruError::ParUnknownFlag(flag) 
                 => write!(f, "Unknown flag '{}'.", flag),
-            ParParseError::UnrecognisedKey(k) 
+            PsruError::ParUnrecognisedKey(k) 
                 => write!(f, "Unrecognised key '{}'.", k),
-            ParParseError::UnknownBinaryModel(m) 
+            PsruError::UnknownBinaryModel(m) 
                 => write!(f, "Unknown binary model '{}'.", m),
-            ParParseError::UnknownTimeEphemeris(te) 
+            PsruError::UnknownTimeEphemeris(te) 
                 => write!(f, "Unknown time ephemeris '{}'.", te),
-            ParParseError::UnknownT2CMethod(t2cm) 
+            PsruError::UnknownT2CMethod(t2cm) 
                 => write!(f, "Unknown t2CMethod '{}'.", t2cm),
-            ParParseError::UnknownErrorMode(em) 
+            PsruError::UnknownErrorMode(em) 
                 => write!(f, "Unknown error mode '{}'.", em),
-            ParParseError::UnknownUnits(u) 
+            PsruError::UnknownUnits(u) 
                 => write!(f, "Unknown units '{}'.", u),
 
-            ParParseError::IncompleteJump(j) 
+            PsruError::IncompleteJump(j) 
                 => write!(f, "Incomplete jump '{}'.", j),
-            ParParseError::BadGlitch(g) 
+            PsruError::BadGlitch(g) 
                 => write!(f, "Glitch with index {} is incomplete.", g),
 
-            ParParseError::NoName 
+            PsruError::ParNoName 
                 => write!(f, "Missing PSR parameter."),
-            ParParseError::NoFrequency 
+            PsruError::ParNoFrequency 
                 => write!(f, "Missing F0 parameter."),
-            ParParseError::NoPEpoch 
+            PsruError::ParNoPEpoch 
                 => write!(f, "Missing PEPOCH parameter."),
-            ParParseError::NoDispersion
+            PsruError::ParNoDispersion
                 => write!(f, "Missing DM parameter."),
 
-            ParParseError::BadPEpoch
+            PsruError::ParBadPEpoch
                 => write!(f, "Bad PEPOCH parameter."),
-            ParParseError::BadFrequency
+            PsruError::ParBadFrequency
                 => write!(f, "Bad F0 parameter."),
 
-            ParParseError::DuplicateParameters(items) 
+            PsruError::ParDuplicateParameters(items) 
                 => write!(
                     f, "There are duplicate parameters defined:{}", 
                     items
@@ -89,10 +96,20 @@ impl std::fmt::Display for ParParseError {
                             format!("{}\n * '{}' and '{}'", a, l1, l2))
                         ),
             
-            ParParseError::RepeatParam(param)
+            PsruError::ParRepeatParam(param)
                 => write!(f, "Repeated '{}' parameter.", param),
+
+            
+            PsruError::TimNotFormat1 => write!(f, 
+                "Currently only TEMPO2 format (FORMAT 1) is supported."),
+            PsruError::TimUnexpectedEOL => write!(f, 
+                "TOA line ended prematurely"),
+            PsruError::TimMalformedMJD => write!(f,
+                "MJD is expected to be in decimal format."),
+            PsruError::TimUnvaluedFlag(flag) => write!(f,
+                "Flag '{}' did not have a value.", flag),
         }
     }
 }
 
-impl Error for ParParseError {}
+impl Error for PsruError {}

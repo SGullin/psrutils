@@ -9,10 +9,9 @@ repository = "https://github.com/SGullin/psrutils"
 readme = "readme.md"
 keywords = ["astronomy", "pulsars"]
 categories = ["data-structures", "science", "parsing"]
-include = [
-    "*.rs",
-    "Cargo.toml",
-    "readme.md",
+exclude = [
+    ".*",
+    "Cargo.toml.orig",
 ]
 
 [dependencies]

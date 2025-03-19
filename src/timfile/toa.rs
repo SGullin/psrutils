@@ -18,6 +18,8 @@ pub struct TOAInfo {
     pub flags: Vec<Flag>,
 }
 impl TOAInfo {
+    /// Reads in tempo2 format. Comments are a little more allwoing than should
+    /// be...
     pub(crate) fn parse_tempo2(parts: &[&str]) -> Result<Self, PsruError> {
         let is_bad = parts[0] == "c" || parts[0] == "C";
         let (mut comments, mut values): (Vec<&str>, Vec<&str>) = parts
@@ -104,7 +106,25 @@ impl TOAInfo {
         })
     }
     
-    pub(crate) fn parse_parkes(parts: &[&str]) -> Result<Self, PsruError> {
+    /// Not fully implemented.
+    pub(crate) fn parse_parkes(line: &str) -> Result<Self, PsruError> {
+        if !line.is_ascii() {
+            return Err(PsruError::TimNotAscii(None));
+        }
+
+        if &line[0..1] != " " {
+            return Err(PsruError::TimParkesMissingBlank(None));
+        }
+        if &line[41..42] != "." {
+            return Err(PsruError::TimParkesMissingPeriod(None));
+        }
+        // let freq_text = &line[25..34];
+        // let toa_int = &line[34..41];
+        // let toa_frac = &line[42..54];
+        // let phase = &line[55..62];
+        // let toa_err = &line[63..70];
+        // let observatory = &line[79..80];
+
         todo!()
     }
 }

@@ -8,13 +8,15 @@ mod tests;
 
 /// Reads a .tim file recursively. Returns errors for missing TOA values,
 /// flags without values, and malformed entries.
-pub fn read_tim(path: &PathBuf) -> Result<Vec<TOAInfo>, PsruError> {
+/// 
+/// Currently, the only implemented format is for Tempo2.
+pub fn read_tim(path: PathBuf, format: TimFormat) -> Result<Vec<TOAInfo>, PsruError> {
     let mut toa_infos = Vec::new();
-    let file = File::open(path).map_err(PsruError::IOError)?;
+
+    let file = File::open(path.clone()).map_err(PsruError::IOError)?;
     let reader = BufReader::new(file);
 
-    let mut mode = ReadingMode::Tempo2;
-    let directory = path.clone().parent().unwrap().to_path_buf();
+    let directory = path.parent().unwrap().to_path_buf();
     let mut ctx = TimContext::new(&path.to_string_lossy(), 0);
 
     for (line_number, result) in reader.lines().enumerate() {
@@ -22,9 +24,8 @@ pub fn read_tim(path: &PathBuf) -> Result<Vec<TOAInfo>, PsruError> {
         if line.is_empty() { continue; }
         
         ctx.line(line_number + 1);
-        println!("ctx: {:?}", ctx);
-        
-        parse_line(&mut mode, &directory, &mut toa_infos, &line)
+
+        parse_line(format, directory.clone(), &mut toa_infos, &line)
             .map_err(|err| err.set_tim_ctx(&ctx))?;
     }
     
@@ -32,25 +33,27 @@ pub fn read_tim(path: &PathBuf) -> Result<Vec<TOAInfo>, PsruError> {
 }
     
 fn parse_line(
-    mode: &mut ReadingMode,
-    directory: &PathBuf,
+    mode: TimFormat,
+    mut directory: PathBuf,
     toa_infos: &mut Vec<TOAInfo>, 
     line: &str
 ) -> Result<(), PsruError> {
     let parts = line.split_whitespace().collect::<Vec<_>>();
-    println!("{:?}", parts);
 
     if parts[0] == "INCLUDE" {
-        let mut path = directory.clone();
-        path.push(parts[1]);
-        let mut nested_tim = read_tim(&path)?;
+        directory.push(parts[1]);
+        let mut nested_tim = read_tim(directory, mode)?;
         
         toa_infos.append(&mut nested_tim);
         return Ok(())
     }
 
     if parts[0] == "FORMAT" && parts[1] == "1" {
-        *mode = ReadingMode::Tempo2;
+        if mode != TimFormat::Tempo2 {
+            return Err(PsruError::TimFormatDiscrepancy(
+                None, String::from("Tempo2"))
+            );
+        }
         return Ok(())
     }
 
@@ -60,8 +63,8 @@ fn parse_line(
     }
 
     let toa_info = match mode {
-        ReadingMode::Tempo2 => TOAInfo::parse_tempo2(&parts)?,
-        ReadingMode::Parkes => TOAInfo::parse_parkes(&parts)?,
+        TimFormat::Tempo2 => TOAInfo::parse_tempo2(&parts)?,
+        TimFormat::Parkes => TOAInfo::parse_parkes(line)?,
     };
 
     toa_infos.push(toa_info);
@@ -69,7 +72,10 @@ fn parse_line(
     Ok(())
 }
 
-enum ReadingMode {
+#[derive(Debug, PartialEq, Clone, Copy)]
+/// The format used for parsing TOAs in .tim files.
+pub enum TimFormat {
     Tempo2,
+    /// Not implemented.
     Parkes,
 }

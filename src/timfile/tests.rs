@@ -4,7 +4,7 @@ use std::io::{BufReader, LineWriter};
 use super::*;
 
 #[allow(unused)]
-const MINIMAL: &[&str] = &[
+const T2_MINIMAL: &[&str] = &[
     "dir/file.ext",
     "999.999",
     "55000.97531",
@@ -13,9 +13,9 @@ const MINIMAL: &[&str] = &[
 ];
 
 #[test]
-fn incomplete() {
-    for i in 0..MINIMAL.len() { 
-        let line = MINIMAL
+fn t2_incomplete() {
+    for i in 0..T2_MINIMAL.len() { 
+        let line = T2_MINIMAL
             .iter()
             .enumerate()
             .filter(|(j,_)| i != *j)
@@ -28,15 +28,15 @@ fn incomplete() {
     }
 }
 #[test]
-fn minimal() {
-    TOAInfo::parse_tempo2(MINIMAL).unwrap();
+fn t2_minimal() {
+    TOAInfo::parse_tempo2(T2_MINIMAL).unwrap();
 }
 #[test]
-fn bad() {
-    TOAInfo::parse_tempo2(&[&["C"],MINIMAL].concat()).unwrap();
+fn t2_bad() {
+    TOAInfo::parse_tempo2(&[&["C"],T2_MINIMAL].concat()).unwrap();
 }
 #[test]
-fn comments() {
+fn t2_comments() {
     let parts = [
         "#hii",
         "dir/file.ext",
@@ -48,3 +48,7 @@ fn comments() {
     ];
     TOAInfo::parse_tempo2(&parts).unwrap();
 }
+// #[test]
+// fn file() {
+//     read_tim("testing/test.tim".into(), TimFormat::Tempo2).unwrap();
+// }

@@ -33,10 +33,13 @@ pub enum PsruError {
     ParRepeatParam(String),
 
     // Tim errors ---------------------------------
-    TimNotFormat1(Option<TimContext>),
     TimUnexpectedEOL(Option<TimContext>),
     TimMalformedMJD(Option<TimContext>),
     TimUnvaluedFlag(Option<TimContext>, String),
+    TimFormatDiscrepancy(Option<TimContext>, String),
+    TimNotAscii(Option<TimContext>),
+    TimParkesMissingBlank(Option<TimContext>),
+    TimParkesMissingPeriod(Option<TimContext>),
 }
 impl std::fmt::Display for PsruError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -99,10 +102,6 @@ impl std::fmt::Display for PsruError {
             PsruError::ParRepeatParam(param)
                 => write!(f, "Repeated '{}' parameter.", param),
 
-            
-            PsruError::TimNotFormat1(ctx) => write!(f, 
-                "{} Currently only TEMPO2 format (FORMAT 1) is supported.",
-                tim_ctx(ctx)),
             PsruError::TimUnexpectedEOL(ctx) => write!(f, 
                 "{} TOA line ended prematurely",
                 tim_ctx(ctx)),
@@ -112,16 +111,29 @@ impl std::fmt::Display for PsruError {
             PsruError::TimUnvaluedFlag(ctx, flag) => write!(f,
                 "{} Flag '{}' did not have a value.", 
                 tim_ctx(ctx), flag),
+            PsruError::TimFormatDiscrepancy(ctx, fmt) => write!(f,
+                "{} Read format does not match supplied '{}'", 
+                tim_ctx(ctx), fmt),
+            PsruError::TimNotAscii(ctx) => write!(f,
+                "{} Cannot handle non-ascii text in the supplied mode.",
+                tim_ctx(ctx)),
+            PsruError::TimParkesMissingBlank(ctx) => write!(f,
+                "{} There's supposed to be a blank space in the first column.",
+                tim_ctx(ctx)),
+            PsruError::TimParkesMissingPeriod(ctx) => write!(f,
+                "{} There's supposed to be a period in the column 42.",
+                tim_ctx(ctx)),
         }
     }
 }
 impl PsruError {
     pub fn set_tim_ctx(mut self, ctx: &TimContext) -> PsruError {
         let old_ctx = match &mut self {
-            PsruError::TimNotFormat1(ctx) => ctx,
             PsruError::TimUnexpectedEOL(ctx) => ctx,
             PsruError::TimMalformedMJD(ctx) => ctx,
             PsruError::TimUnvaluedFlag(ctx, _) => ctx,
+            PsruError::TimFormatDiscrepancy(ctx, _) => ctx,
+            PsruError::TimNotAscii(ctx) => ctx,
             _ => return self,
         };
 

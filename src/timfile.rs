@@ -1,7 +1,7 @@
 use std::{fs::File, io::{BufRead, BufReader}, path::PathBuf};
-use toa::TOAInfo;
-
 use crate::error::{PsruError, TimContext};
+
+pub use toa::*;
 
 mod toa;
 mod tests;

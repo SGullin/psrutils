@@ -1,4 +1,5 @@
-use super::{parse_f64, ParParseError};
+use super::PsruError;
+use crate::parse_tools::parse_f64;
 
 #[derive(Debug, Default, Clone)]
 pub struct Glitch {
@@ -27,7 +28,7 @@ impl Glitch {
     /// there is no glitch 1, that produces a warning in the end of the `read`
     /// function. If there is not enough data to fully define a glitch, it is 
     /// removed and a warning is issued.
-    pub(crate) fn parse(parts: &[&str], glitches: &mut Vec<Glitch>) -> Result<bool, ParParseError> {
+    pub(crate) fn parse(parts: &[&str], glitches: &mut Vec<Glitch>) -> Result<bool, PsruError> {
         let p0ps = parts[0].split("_").collect::<Vec<_>>();
         if p0ps.len() != 2 {
             return Ok(false);
@@ -39,7 +40,7 @@ impl Glitch {
         
         let index = p0ps[1]
         .parse::<usize>()
-        .map_err(|_| ParParseError::Unparsable { 
+        .map_err(|_| PsruError::Unparsable { 
             value: p0ps[0].to_string(), 
             to_type: "glitch index",
         })?;
@@ -67,11 +68,11 @@ impl Glitch {
     }
     
     /// Checks if the glitch is defined enough.
-    pub(crate) fn check(&self) -> Result<(), ParParseError> {
+    pub(crate) fn check(&self) -> Result<(), PsruError> {
         if self.f0 == 0.0 
         || self.f0d == 0.0 
         || self.epoch == 0.0 {
-            return Err(ParParseError::BadGlitch(self.number));
+            return Err(PsruError::BadGlitch(self.number));
         }
 
         Ok(())

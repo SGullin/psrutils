@@ -1,5 +1,7 @@
-use super::error::ParParseError;
-type Result<T> = std::result::Result<T, ParParseError>;
+use crate::error::PsruError;
+use crate::parse_tools::*;
+
+type Result<T> = std::result::Result<T, PsruError>;
 
 #[derive(Debug, Default, PartialEq)]
 pub enum FittedParameterValue<T> {
@@ -79,18 +81,18 @@ pub(super) fn parse_dec(
 ) -> Result<J2000Coord> {
     let coord_parts = value.split(":").collect::<Vec<_>>();
     if coord_parts.len() != 3 {
-        return Err(ParParseError::InvalidDec(value.to_string()))
+        return Err(PsruError::InvalidDec(value.to_string()))
     }
     
     let degrees = coord_parts[0]
         .parse::<i8>()
-        .map_err(|_| ParParseError::Unparsable { 
+        .map_err(|_| PsruError::Unparsable { 
             value: coord_parts[0].to_string(), 
             to_type: "degrees [-90, 90]",
         })?;
     let minutes = coord_parts[1]
         .parse::<u8>()
-        .map_err(|_| ParParseError::Unparsable { 
+        .map_err(|_| PsruError::Unparsable { 
             value: coord_parts[0].to_string(), 
             to_type: "minutes",
         })?;
@@ -102,7 +104,7 @@ pub(super) fn parse_dec(
     || degrees == 90 && (minutes > 0 || seconds > 0.0)
     || minutes >= 60 
     || seconds >= 60.0 {
-        return Err(ParParseError::InvalidRA(value.to_string()));
+        return Err(PsruError::InvalidRA(value.to_string()));
     }
 
     let fit_info = if parts.len() > 3 {
@@ -122,18 +124,18 @@ pub(super) fn parse_ra(
 ) -> Result<J2000Coord> {
     let coord_parts = value.split(":").collect::<Vec<_>>();
     if coord_parts.len() != 3 {
-        return Err(ParParseError::InvalidRA(value.to_string()));
+        return Err(PsruError::InvalidRA(value.to_string()));
     }
     
     let hours = coord_parts[0]
         .parse::<i8>()
-        .map_err(|_| ParParseError::Unparsable { 
+        .map_err(|_| PsruError::Unparsable { 
             value: coord_parts[0].to_string(), 
             to_type: "hours [0, 24]"
         })?;
     let minutes = coord_parts[1]
         .parse::<u8>()
-        .map_err(|_| ParParseError::Unparsable { 
+        .map_err(|_| PsruError::Unparsable { 
             value: coord_parts[0].to_string(), 
             to_type: "minutes",
         })?;
@@ -143,7 +145,7 @@ pub(super) fn parse_ra(
     || hours < 0 
     || minutes >= 60 
     || seconds >= 60.0 {
-        return Err(ParParseError::InvalidRA(value.to_string()));
+        return Err(PsruError::InvalidRA(value.to_string()));
     }
 
     let fit_info = if parts.len() > 3 {
@@ -234,31 +236,7 @@ pub(super) fn parse_text(parts: &[&str]) -> Result<Option<Parameter<String>>> {
         .iter()
         .find(|t| t.0 == key || t.1.contains(&key))
         .map(|data| Some(Parameter::new(data, value.to_string())))
-        .ok_or_else(|| ParParseError::UnrecognisedKey(key.to_string()))
-}
-
-pub(super) fn parse_f64(value: &str) -> Result<f64> {
-    value.parse()
-        .map_err(|_| ParParseError::Unparsable { 
-            value: value.to_string(), to_type: "double"
-        })
-}
-
-pub(super) fn parse_u32(value: &str) -> Result<u32> {
-    value.parse()
-        .map_err(|_| ParParseError::Unparsable { 
-            value: value.to_string(), to_type: "integer"
-        })
-}
-
-pub(super) fn parse_bool(value: &str) -> Result<bool> {
-    match value {
-        "1" | "Y" | "y" => Ok(true),
-        "0" | "N" | "n" => Ok(false),
-        _ => Err(ParParseError::Unparsable { 
-            value: value.to_string(), to_type: "bool" 
-        })
-    }
+        .ok_or_else(|| PsruError::ParUnrecognisedKey(key.to_string()))
 }
 
 /// All documented parfile parameters with f64 values.

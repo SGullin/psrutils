@@ -2,13 +2,13 @@ use std::io::{BufRead, Write};
 
 use glitch::Glitch;
 use jump::Jump;
-use error::ParParseError;
 use parameters::*;
+
+use crate::error::PsruError;
 
 mod parameters;
 mod glitch;
 mod jump;
-mod error;
 mod tests;
 
 #[derive(Debug, Default, PartialEq)]
@@ -112,11 +112,11 @@ impl Parfile {
     /// Most parameters are `f64` values, but some are `String`, a couple are
     /// `u32`, and a few have their own enums to avoid excessive `String` 
     /// usage.
-    pub fn read(reader: impl BufRead) -> Result<Self, ParParseError> {
+    pub fn read(reader: impl BufRead) -> Result<Self, PsruError> {
         let mut par = Parfile::default();
 
         for result in reader.lines() {
-            let line = result.map_err(ParParseError::IOError)?;
+            let line = result.map_err(PsruError::IOError)?;
             if line.is_empty() { continue; }
             par.parse_line(&line)?;
         }
@@ -130,7 +130,7 @@ impl Parfile {
     /// 
     /// Note that the order of parameters and whitespace may differ from any
     /// input file used to construct it, but will be consistent.
-    pub fn write(&self, writer: &mut impl Write) -> Result<(), ParParseError> {
+    pub fn write(&self, writer: &mut impl Write) -> Result<(), PsruError> {
         self.check()?;
 
         // It's nice to put the name up top, even though it is a regular text
@@ -138,7 +138,7 @@ impl Parfile {
         let name_index = self.texts
             .iter()
             .position(|t| t.name() == "PSR")
-            .ok_or(ParParseError::NoName)?;
+            .ok_or(PsruError::ParNoName)?;
 
         let mut texts = self.texts
             .iter()
@@ -152,25 +152,25 @@ impl Parfile {
             format!("{}\n", self.ra),
             format!("{}\n", self.dec),
         ] {
-            writer.write(line.as_bytes()).map_err(ParParseError::IOError)?;
+            writer.write(line.as_bytes()).map_err(PsruError::IOError)?;
         }
 
         // Double params
         for parameter in &self.parameters {
             writer.write(parameter.to_string().as_bytes())
-                .map_err(ParParseError::IOError)?;
+                .map_err(PsruError::IOError)?;
         }
 
         // Integer params
         for parameter in &self.counts {
             let line =  format!("{} {}\n", parameter.name(), parameter.value());
-            writer.write(line.as_bytes()).map_err(ParParseError::IOError)?;
+            writer.write(line.as_bytes()).map_err(PsruError::IOError)?;
         }
 
         // String params
         for parameter in texts {
             let line =  format!("{} {}\n", parameter.name(), parameter.value());
-            writer.write(line.as_bytes()).map_err(ParParseError::IOError)?;
+            writer.write(line.as_bytes()).map_err(PsruError::IOError)?;
         }
 
         // Flags
@@ -183,61 +183,61 @@ impl Parfile {
                     false => "N\n",
                 }
             );
-            writer.write(line.as_bytes()).map_err(ParParseError::IOError)?;
+            writer.write(line.as_bytes()).map_err(PsruError::IOError)?;
         }
 
         // Oddballs
         if self.time_eph != TimeEphemeris::Unstated {
             let line = format!("TIMEEPH {:?}\n", self.time_eph);
             writer.write(line.as_bytes())
-                .map_err(ParParseError::IOError)?;
+                .map_err(PsruError::IOError)?;
         }
         if self.binary_model != BinaryModel::Unstated {
             let line = format!("MODEL {:?}\n", self.binary_model);
             writer.write(line.as_bytes())
-                .map_err(ParParseError::IOError)?;
+                .map_err(PsruError::IOError)?;
         }
         if self.units != Units::Unstated {
             let line = format!("UNITS {:?}\n", self.units);
             writer.write(line.as_bytes())
-                .map_err(ParParseError::IOError)?;
+                .map_err(PsruError::IOError)?;
         }
         if self.t2c_method != T2CMethod::Unstated {
             let line = format!("T2CMETHOD {:?}\n", self.t2c_method);
             writer.write(line.as_bytes())
-                .map_err(ParParseError::IOError)?;
+                .map_err(PsruError::IOError)?;
         }
         match self.error_mode {
             ErrorMode::Unstated => {},
             ErrorMode::Mode0 => {
                 writer.write("MODE 0\n".as_bytes())
-                    .map_err(ParParseError::IOError)?;
+                    .map_err(PsruError::IOError)?;
             },
             ErrorMode::Mode1 => {
                 writer.write("MODE 1\n".as_bytes())
-                    .map_err(ParParseError::IOError)?;
+                    .map_err(PsruError::IOError)?;
             },
         }
 
         // Glitches
         for glitch in &self.glitches {
             let lines = glitch.write();
-            writer.write(lines.as_bytes()).map_err(ParParseError::IOError)?;
+            writer.write(lines.as_bytes()).map_err(PsruError::IOError)?;
         }
 
         // Jumps
         for jump in &self.jumps {
             let line = jump.write();
-            writer.write(line.as_bytes()).map_err(ParParseError::IOError)?;
+            writer.write(line.as_bytes()).map_err(PsruError::IOError)?;
         }
 
         Ok(())
     }
 
-    fn parse_line(&mut self, line: &str) -> Result<(), ParParseError> {
+    fn parse_line(&mut self, line: &str) -> Result<(), PsruError> {
         let parts = line.split_whitespace().collect::<Vec<_>>();
         if parts.len() < 2 {
-            return Err(ParParseError::MissingValue(parts[0].to_string()));
+            return Err(PsruError::ParMissingValue(parts[0].to_string()));
         }
 
         if Glitch::parse(&parts, &mut self.glitches)? { return Ok(()); }
@@ -267,14 +267,14 @@ impl Parfile {
     fn parse_special(
         &mut self, 
         parts: &[&str],
-    ) -> Result<bool, ParParseError> {
+    ) -> Result<bool, PsruError> {
         let key = parts[0];
         let value = parts[1];
 
         // Coords
         if COORDS[0].1.contains(&key) {
             if *self.ra.value() != FittedParameterValue::Missing {
-                return Err(ParParseError::RepeatParam(COORDS[0].0.to_string()));
+                return Err(PsruError::ParRepeatParam(COORDS[0].0.to_string()));
             }
 
             self.ra = Parameter::new(
@@ -286,7 +286,7 @@ impl Parfile {
         }
         if COORDS[1].1.contains(&key) {
             if *self.dec.value() != FittedParameterValue::Missing { 
-                return Err(ParParseError::RepeatParam(COORDS[1].0.to_string()));
+                return Err(PsruError::ParRepeatParam(COORDS[1].0.to_string()));
             }
             
             self.dec = Parameter::new(
@@ -300,12 +300,12 @@ impl Parfile {
         // Which time ephemeris to use (IF99/FB90)
         if "TIMEEPH" == key {
             if self.time_eph != TimeEphemeris::Unstated {
-                return Err(ParParseError::RepeatParam(String::from("TIMEEPH")))
+                return Err(PsruError::ParRepeatParam(String::from("TIMEEPH")))
             }
             self.time_eph = match value {
                 "IF99" => TimeEphemeris::IF99,
                 "FB90" => TimeEphemeris::FB90,
-                other => return Err(ParParseError::UnknownTimeEphemeris(other.to_string()))
+                other => return Err(PsruError::UnknownTimeEphemeris(other.to_string()))
             };
             return Ok(true);
         }
@@ -313,14 +313,14 @@ impl Parfile {
         // Binary model
         if "MODEL" == key {
             if self.binary_model != BinaryModel::Unstated {
-                return Err(ParParseError::RepeatParam(String::from("MODEL")))
+                return Err(PsruError::ParRepeatParam(String::from("MODEL")))
             }
             self.binary_model = match value {
                 "BT" => BinaryModel::BT,
                 "DD" => BinaryModel::DD,
                 "ELL1" => BinaryModel::ELL1,
                 "MSS" => BinaryModel::MSS,
-                other => return Err(ParParseError::UnknownBinaryModel(other.to_string()))
+                other => return Err(PsruError::UnknownBinaryModel(other.to_string()))
             };
             return Ok(true);
         }
@@ -328,12 +328,12 @@ impl Parfile {
         // Method for transforming from terrestrial to celestial frame 
         if "T2CMETHOD" == key {
             if self.t2c_method != T2CMethod::Unstated {
-                return Err(ParParseError::RepeatParam(String::from("T2CMETHOD")))
+                return Err(PsruError::ParRepeatParam(String::from("T2CMETHOD")))
             }
             self.t2c_method = match value {
                 "TEMPO" => T2CMethod::TEMPO,
                 "IAU2000B" => T2CMethod::IAU2000B,
-                other => return Err(ParParseError::UnknownT2CMethod(other.to_string()))
+                other => return Err(PsruError::UnknownT2CMethod(other.to_string()))
             };
             return Ok(true);
         }
@@ -341,25 +341,25 @@ impl Parfile {
         // Units
         if "UNITS" == key {
             if self.units != Units::Unstated {
-                return Err(ParParseError::RepeatParam(String::from("UNITS")))
+                return Err(PsruError::ParRepeatParam(String::from("UNITS")))
             }
             self.units = match value {
                 "SI" => Units::SI,
                 "TCB" => Units::TCB,
                 "TDB" => Units::TDB,
-                other => return Err(ParParseError::UnknownUnits(other.to_string()))
+                other => return Err(PsruError::UnknownUnits(other.to_string()))
             };
             return Ok(true);
         }
 
         if "MODE" == key {
             if self.error_mode != ErrorMode::Unstated {
-                return Err(ParParseError::RepeatParam(String::from("MODE")))
+                return Err(PsruError::ParRepeatParam(String::from("MODE")))
             }
             self.error_mode = match value {
                 "0" => ErrorMode::Mode0,
                 "1" => ErrorMode::Mode1,
-                other => return Err(ParParseError::UnknownErrorMode(other.to_string()))
+                other => return Err(PsruError::UnknownErrorMode(other.to_string()))
             };
             return Ok(true);
         }
@@ -368,13 +368,13 @@ impl Parfile {
     }
     
     /// Performs a little check to see everything's ok.
-    fn check(&self) -> Result<(), ParParseError> {
+    fn check(&self) -> Result<(), PsruError> {
         // Check mandatory params
         if self.texts
             .iter()
             .find(|t| t.name() == "PSR")
             .is_none() {
-            return Err(ParParseError::NoName);
+            return Err(PsruError::ParNoName);
         }
         self.parameters
             .iter()
@@ -384,9 +384,9 @@ impl Parfile {
                     FittedParameterValue::Missing => false,
                     FittedParameterValue::JustValue(v) => v > 0.0,
                     FittedParameterValue::FitInfo { value, .. } => value > 0.0,
-                }{ Ok(()) } else { Err(ParParseError::BadPEpoch) }
+                }{ Ok(()) } else { Err(PsruError::ParBadPEpoch) }
             )
-            .unwrap_or(Err(ParParseError::NoPEpoch))?;
+            .unwrap_or(Err(PsruError::ParNoPEpoch))?;
         
         self.parameters
             .iter()
@@ -396,21 +396,21 @@ impl Parfile {
                     FittedParameterValue::Missing => false,
                     FittedParameterValue::JustValue(v) => v > 0.0,
                     FittedParameterValue::FitInfo { value, .. } => value > 0.0,
-                } { Ok(()) } else { Err(ParParseError::BadFrequency) }
+                } { Ok(()) } else { Err(PsruError::ParBadFrequency) }
             )
-            .unwrap_or(Err(ParParseError::NoFrequency))?;
+            .unwrap_or(Err(PsruError::ParNoFrequency))?;
 
         if self.parameters
             .iter()
             .find(|t| t.name() == "DM")
             .is_none() {
-            return Err(ParParseError::NoDispersion);
+            return Err(PsruError::ParNoDispersion);
         }
 
         // Check for duplicates
         let p64dupes = find_duplicates(&self.parameters);
         if !p64dupes.is_empty() {
-            return Err(ParParseError::DuplicateParameters(
+            return Err(PsruError::ParDuplicateParameters(
                 p64dupes
                     .into_iter()
                     .map(|(i, j)| (
@@ -421,7 +421,7 @@ impl Parfile {
         }
         let ptdupes = find_duplicates(&self.texts);
         if !ptdupes.is_empty() {
-            return Err(ParParseError::DuplicateParameters(
+            return Err(PsruError::ParDuplicateParameters(
                 ptdupes
                     .into_iter()
                     .map(|(i, j)| (
@@ -432,7 +432,7 @@ impl Parfile {
         }
         let fdupes = find_duplicates(&self.flags);
         if !fdupes.is_empty() {
-            return Err(ParParseError::DuplicateParameters(
+            return Err(PsruError::ParDuplicateParameters(
                 fdupes
                     .into_iter()
                     .map(|(i, j)| (

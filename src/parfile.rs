@@ -1,10 +1,23 @@
 use std::io::{BufRead, Write};
 
-use glitch::Glitch;
-use jump::Jump;
-use parameters::*;
+pub use glitch::Glitch;
+pub use jump::Jump;
+pub use parameters::{
+    Parameter,
+    FittedParameter, 
+    FittedParameterValue, 
+    J2000Fit
+};
+use parameters::{
+    parse_coord, 
+    parse_count, 
+    parse_fitted, 
+    parse_flag, 
+    parse_text, 
+    COORDS
+};
 
-use crate::error::PsruError;
+use crate::{data_types::{DECCoordType, RACoordType}, error::PsruError};
 
 mod parameters;
 mod glitch;
@@ -72,9 +85,9 @@ pub enum Units {
 #[derive(Debug, Default)]
 pub struct Parfile {
     /// J2000 right ascension (hh:mm:ss.sss)
-    pub ra: Parameter<J2000Coord>,
+    pub ra: Parameter<J2000Fit<RACoordType>>,
     /// J2000 declination (dd:mm:ss.sss)
-    pub dec: Parameter<J2000Coord>,
+    pub dec: Parameter<J2000Fit<DECCoordType>>,
 
     /// All double precision parameters, and optional data on whether to fit 
     /// them, with errors. See `FittedParameter` for more info.
@@ -279,7 +292,7 @@ impl Parfile {
 
             self.ra = Parameter::new(
                 &COORDS[0],
-                parse_ra(value, parts)?,
+                parse_coord::<RACoordType>(value, parts)?,
             );
             
             return Ok(true);
@@ -291,7 +304,7 @@ impl Parfile {
             
             self.dec = Parameter::new(
                 &COORDS[1],
-                parse_dec(value, parts)?,
+                parse_coord::<DECCoordType>(value, parts)?,
             );
             
             return Ok(true);

@@ -25,4 +25,4 @@ The `timfile` module contains a method for reading `.tim` files, yielding a `Vec
 
 
 ### License
-`psrutils` is distributed under the terms of both the [MIT License](LICENSE_MIT.txt) and the [Apache License (2.0)](LICENSE_APACHE.txt).
+`psrutils` is distributed under the terms of both the [MIT License](LICENSE.MIT) and the [Apache License (2.0)](LICENSE.Apache-2.0).

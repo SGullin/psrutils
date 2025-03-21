@@ -3,6 +3,7 @@
 [![Crates.io Version](https://img.shields.io/crates/v/psrutils)](https://crates.io/crates/psrutils)
 [![GitHub](https://badgen.net/badge/icon/github?icon=github&label)](https://github.com/SGullin/psrutils)
 [![docs](https://img.shields.io/docsrs/psrutils?logo=rust&style)](https://docs.rs/psrutils/latest/)
+[![docs](https://img.shields.io/docsrs/psrutils?logo=rust&style)](https://docs.rs/psrutils/latest/)
 
 
 A small crate for use in pulsar timing projects.

@@ -1,5 +1,7 @@
 # `psrutils`
 [![GitHub license](https://img.shields.io/badge/license-Apache--2.0_OR_MIT-blue?style=flat-square)](#license)
+[![docs](https://img.shields.io/docsrs/psrutils?logo=rust&style=flat-square)](https://docs.rs/psrutils/latest/)
+[![GitHub](https://badgen.net/badge/icon/github?icon=github&label)](https://github.com/SGullin/psrutils)
 
 
 A small crate for use in pulsar timing projects.

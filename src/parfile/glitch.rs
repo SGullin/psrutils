@@ -4,19 +4,19 @@ use crate::parse_tools::parse_f64;
 #[derive(Debug, Default, Clone)]
 pub struct Glitch {
     /// The index used in the file
-    number: usize,
+    pub number: usize,
     /// Glitch epoch (MJD)
-    epoch: f64,
+    pub epoch: f64,
     /// Glitch phase increment
-    phase: f64,
+    pub phase: f64,
     /// Glitch permanent pulse frequency increment (Hz)
-    f0: f64,
+    pub f0: f64,
     /// Glitch permanent frequency derivative increment (s^-2)
-    f1: f64,
+    pub f1: f64,
     /// Glitch pulse frequency increment (Hz)
-    f0d: f64,
+    pub f0d: f64,
     /// Glitch Decay time constant (Hz)
-    td: f64,
+    pub td: f64,
 }
 
 impl Glitch {

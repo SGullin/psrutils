@@ -1,3 +1,6 @@
+use std::str::FromStr;
+
+use crate::data_types::J2000Coord;
 use crate::error::PsruError;
 use crate::parse_tools::*;
 
@@ -38,122 +41,41 @@ impl<T> Parameter<T> {
         }
     }
 }
-impl std::fmt::Display for Parameter<FittedParameterValue<f64>> {
+impl<T> std::fmt::Display for Parameter<FittedParameterValue<T>> 
+where T: std::fmt::Display {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.value {
+        match &self.value {
             FittedParameterValue::Missing => write!(f, "MISSING"),
             FittedParameterValue::FitInfo { value, fit, error } => write!(
                 f,
                 "{} {} {} {}\n",
                 self.name,
                 value,
-                if fit {"1"} else {"0"},
+                if *fit {"1"} else {"0"},
                 error,
             ),
             FittedParameterValue::JustValue(v) => write!(f, "{} {}\n", self.name, v),
         }
     }
 }
-impl std::fmt::Display for Parameter<J2000Coord> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.value {
-            FittedParameterValue::Missing => write!(f, "MISSING PARAMETER"),
-            FittedParameterValue::FitInfo { value, fit, error } => write!(
-                f,
-                "{} {}:{}:{} {} {}\n",
-                self.name,
-                value.0, value.1, value.2,
-                if fit {"1"} else {"0"},
-                error,
-            ),
-            FittedParameterValue::JustValue((v1, v2, v3)) 
-                => write!(f, "{} {}:{}:{}\n", self.name, v1, v2, v3),
-        }
-    }
-}
 
 pub type FittedParameter = Parameter<FittedParameterValue<f64>>;
-pub type J2000Coord = FittedParameterValue<(i8, u8, f64)>;
+pub type J2000Fit<T> = FittedParameterValue<J2000Coord<T>>;
 
-pub(super) fn parse_dec(
+pub(super) fn parse_coord<T>(
     value: &str, 
     parts: &[&str], 
-) -> Result<J2000Coord> {
-    let coord_parts = value.split(":").collect::<Vec<_>>();
-    if coord_parts.len() != 3 {
-        return Err(PsruError::InvalidDec(value.to_string()))
-    }
-    
-    let degrees = coord_parts[0]
-        .parse::<i8>()
-        .map_err(|_| PsruError::Unparsable { 
-            value: coord_parts[0].to_string(), 
-            to_type: "degrees [-90, 90]",
-        })?;
-    let minutes = coord_parts[1]
-        .parse::<u8>()
-        .map_err(|_| PsruError::Unparsable { 
-            value: coord_parts[0].to_string(), 
-            to_type: "minutes",
-        })?;
-    let seconds = parse_f64(coord_parts[2])?;
-
-    if degrees < -90
-    || degrees == -90 && (minutes > 0 || seconds > 0.0) 
-    || degrees > 90 
-    || degrees == 90 && (minutes > 0 || seconds > 0.0)
-    || minutes >= 60 
-    || seconds >= 60.0 {
-        return Err(PsruError::InvalidRA(value.to_string()));
-    }
+) -> Result<J2000Fit<T>> 
+where J2000Coord<T>: FromStr, 
+    <J2000Coord<T> as FromStr>::Err: Into<PsruError>  {
+    let coord = value.parse::<J2000Coord<T>>().map_err(Into::into)?;
 
     let fit_info = if parts.len() > 3 {
         let fit = parse_bool(&parts[2])?;
         let error = parse_f64(&parts[3])?;
-        FittedParameterValue::FitInfo { value: (degrees, minutes, seconds), fit, error }
+        FittedParameterValue::FitInfo { value: coord, fit, error }
     } else {
-        FittedParameterValue::JustValue((degrees, minutes, seconds))
-    };
-
-    Ok(fit_info)
-}
-
-pub(super) fn parse_ra(
-    value: &str, 
-    parts: &[&str], 
-) -> Result<J2000Coord> {
-    let coord_parts = value.split(":").collect::<Vec<_>>();
-    if coord_parts.len() != 3 {
-        return Err(PsruError::InvalidRA(value.to_string()));
-    }
-    
-    let hours = coord_parts[0]
-        .parse::<i8>()
-        .map_err(|_| PsruError::Unparsable { 
-            value: coord_parts[0].to_string(), 
-            to_type: "hours [0, 24]"
-        })?;
-    let minutes = coord_parts[1]
-        .parse::<u8>()
-        .map_err(|_| PsruError::Unparsable { 
-            value: coord_parts[0].to_string(), 
-            to_type: "minutes",
-        })?;
-    let seconds = parse_f64(coord_parts[2])?;
-
-    if hours >= 24 
-    || hours < 0 
-    || minutes >= 60 
-    || seconds >= 60.0 {
-        return Err(PsruError::InvalidRA(value.to_string()));
-    }
-
-    let fit_info = if parts.len() > 3 {
-        let fit = parse_bool(&parts[2])?;
-        let error = parse_f64(&parts[3])?;
-        FittedParameterValue::FitInfo { value: (hours, minutes, seconds), fit, error }
-    } else {
-        FittedParameterValue::JustValue((hours, minutes, seconds))
+        FittedParameterValue::JustValue(coord)
     };
 
     Ok(fit_info)

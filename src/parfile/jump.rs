@@ -5,9 +5,9 @@ use crate::parse_tools::parse_bool;
 /// Add a constant oﬀset between specified TOAs.
 #[derive(Debug)]
 pub struct Jump {
-    selector: JumpType,
-    value: f64,
-    fit: bool,
+    pub selector: JumpType,
+    pub value: f64,
+    pub fit: bool,
 }
 
 #[derive(Debug)]

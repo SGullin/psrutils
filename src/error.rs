@@ -1,3 +1,6 @@
+//! Errors enum.
+#![allow(missing_docs)]
+
 use std::error::Error;
 
 #[derive(Debug)]
@@ -127,7 +130,7 @@ impl std::fmt::Display for PsruError {
     }
 }
 impl PsruError {
-    pub fn set_tim_ctx(mut self, ctx: &TimContext) -> PsruError {
+    pub(crate) fn set_tim_ctx(mut self, ctx: &TimContext) -> PsruError {
         let old_ctx = match &mut self {
             PsruError::TimUnexpectedEOL(ctx) => ctx,
             PsruError::TimMalformedMJD(ctx) => ctx,
@@ -144,7 +147,6 @@ impl PsruError {
         self
     }
 }
-
 impl Error for PsruError {}
 
 #[derive(Debug, Clone)]

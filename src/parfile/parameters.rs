@@ -6,28 +6,43 @@ use crate::parse_tools::*;
 
 type Result<T> = std::result::Result<T, PsruError>;
 
+/// A parameter and information about whether it's being fit or not. 
 #[derive(Debug, Default, PartialEq)]
 pub enum FittedParameterValue<T> {
+    /// For internal use.
     #[default]
     Missing,
 
+    /// There's no information about it being fit or not.
     JustValue(T),
+    /// There's fit information.
     FitInfo {
+        /// The arrived at value.
         value: T,
+        /// Whether to fit or not to fit.
         fit: bool,
+        /// The uncertainty of the fit.
         error: f64,
     }    
 }
 
 #[derive(Debug, Default)]
+/// An entry in a `.par` file. 
 pub struct Parameter<T> {
     name: &'static str,
     description: &'static str,
     value: T,
 }
 impl<T> Parameter<T> {
+    /// The name of the parameter, i.e. a functioning key, and not necessarily
+    /// the most readable thing.
     pub fn name(&self) -> &str { self.name }
+
+    /// A description of the parameter, if it has one. Most entries are based 
+    /// on the Tempo2 manual.
     pub fn description(&self) -> &str { self.description }
+
+    /// The value recorded.
     pub fn value(&self) -> &T { &self.value }
     
     pub(crate) fn new(
@@ -59,8 +74,9 @@ where T: std::fmt::Display {
     }
 }
 
-pub type FittedParameter = Parameter<FittedParameterValue<f64>>;
-pub type J2000Fit<T> = FittedParameterValue<J2000Coord<T>>;
+
+pub(crate) type FittedParameter = Parameter<FittedParameterValue<f64>>;
+pub(crate) type J2000Fit<T> = FittedParameterValue<J2000Coord<T>>;
 
 pub(super) fn parse_coord<T>(
     value: &str, 

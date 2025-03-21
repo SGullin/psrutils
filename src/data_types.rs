@@ -1,3 +1,5 @@
+//! Contains useful datatypes.
+
 mod j2000;
 mod tests;
 

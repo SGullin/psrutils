@@ -19,8 +19,12 @@ pub struct DECCoordType;
 /// underying data structure. 
 #[derive(Debug, Default, PartialEq)]
 pub struct J2000Coord<CT> {
+    /// This is either degrees (for [`DECCoordType`]) or hours (for 
+    /// [`RACoordType`]).
     pub major: i8,
+    /// Minutes, or 60ths of 1 `major` unit.
     pub minutes: u8,
+    /// Seconds, or 3600ths of 1 `major` unit.
     pub seconds: f64,
 
     _phantom: PhantomData<CT>,
@@ -93,6 +97,19 @@ impl FromStr for J2000Coord<DECCoordType> {
     }
 }
 impl J2000Coord<RACoordType> {
+    /// Construct a new ra coordinate. 
+    /// 
+    /// Returns an error for values out of bounds.
+    /// 
+    /// # Examples
+    /// ```
+    /// # use psrutils::data_types::J2000Ra;
+    /// let good = J2000Ra::new(5, 55, 10.30536);
+    /// let bad = J2000Ra::new(26, 0, 0.0);
+    /// 
+    /// assert!(good.is_ok());
+    /// assert!(bad.is_err());
+    /// ```
     pub fn new(hours: i8, minutes: u8, seconds: f64) -> Result<Self> {
         let ra = Self {
             major: hours,
@@ -104,11 +121,12 @@ impl J2000Coord<RACoordType> {
         Ok(ra)
     }
 
-    pub fn verify(&self) -> Result<()> {
+    fn verify(&self) -> Result<()> {
         if self.major >= 24 
         || self.major < 0 
         || self.minutes >= 60 
-        || self.seconds >= 60.0 {
+        || self.seconds >= 60.0
+        || self.seconds < 0.0 {
             return Err(PsruError::InvalidRA(self.to_string()));
         }
 
@@ -116,6 +134,19 @@ impl J2000Coord<RACoordType> {
     }
 }
 impl J2000Coord<DECCoordType> {
+    /// Construct a new dec coordinate. 
+    /// 
+    /// Returns an error for values out of bounds.
+    /// 
+    /// # Examples
+    /// ```
+    /// # use psrutils::data_types::J2000Dec;
+    /// let good = J2000Dec::new(07, 24, 25.4304);
+    /// let bad = J2000Dec::new(100, 0, 0.0);
+    /// 
+    /// assert!(good.is_ok());
+    /// assert!(bad.is_err());
+    /// ```
     pub fn new(degrees: i8, minutes: u8, seconds: f64) -> Result<Self> {
         let dec = Self {
             major: degrees,
@@ -127,13 +158,14 @@ impl J2000Coord<DECCoordType> {
         Ok(dec)
     }
 
-    pub fn verify(&self) -> Result<()> {
+    fn verify(&self) -> Result<()> {
         if self.major < -90
         || self.major == -90 && (self.minutes > 0 || self.seconds > 0.0) 
         || self.major > 90 
         || self.major == 90 && (self.minutes > 0 || self.seconds > 0.0)
         || self.minutes >= 60 
-        || self.seconds >= 60.0 {
+        || self.seconds >= 60.0
+        || self.seconds < 0.0 {
             return Err(PsruError::InvalidDec(self.to_string()));
         }
 

@@ -1,6 +1,15 @@
 use super::PsruError;
 use crate::parse_tools::parse_f64;
 
+/// The data representing a glitch. The index, `number`, is kept as-is 
+/// from the source, but it should be noted that the reader expects a 
+/// non-disjuct range of indices, once everything's been read.
+/// 
+/// If e.g. "GLF1_2" shows up, we assume there should also be a glitch 1 
+/// before it, but perhaps written later, so we presumptiously add it. If 
+/// there is no glitch 1, that produces a warning in the end of the `read`
+/// function. If there is not enough data to fully define a glitch, it is 
+/// removed and a warning is issued.
 #[derive(Debug, Default, Clone)]
 pub struct Glitch {
     /// The index used in the file
@@ -20,14 +29,8 @@ pub struct Glitch {
 }
 
 impl Glitch {
-        /// This will parse one glitch parameter, since there does not seem to be 
+    /// This will parse one glitch parameter, since there does not seem to be 
     /// any restrictions on where these paramaters may occur in the file.
-    /// 
-    /// If e.g. "GLF1_2" shows up, we assume there should also be a glitch 1 
-    /// before it, but perhaps written later, so we presumptiously add it. If 
-    /// there is no glitch 1, that produces a warning in the end of the `read`
-    /// function. If there is not enough data to fully define a glitch, it is 
-    /// removed and a warning is issued.
     pub(crate) fn parse(parts: &[&str], glitches: &mut Vec<Glitch>) -> Result<bool, PsruError> {
         let p0ps = parts[0].split("_").collect::<Vec<_>>();
         if p0ps.len() != 2 {

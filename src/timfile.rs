@@ -1,3 +1,5 @@
+//! Allows for reading the data of `.tim` files.
+
 use std::{fs::File, io::{BufRead, BufReader}, path::PathBuf};
 use crate::error::{PsruError, TimContext};
 
@@ -75,6 +77,7 @@ fn parse_line(
 #[derive(Debug, PartialEq, Clone, Copy)]
 /// The format used for parsing TOAs in .tim files.
 pub enum TimFormat {
+    /// Read `.tim` files the way Tempo2 likes it.
     Tempo2,
     /// Not implemented.
     Parkes,

@@ -1,21 +1,33 @@
+use std::collections::HashMap;
+
 use crate::error::PsruError;
 use crate::parse_tools::*;
 
 /// The basic information contained in a calculated TOA.
 pub struct TOAInfo {
+    /// Whether the TOA is marked as bad.
     pub is_bad: bool,
+    /// The original file the TOA came from.
     pub file: String,
 
+    /// Observation frequency.
     pub frequency: f64,
 
+    /// The integer part of the MJD.
     pub mjd_int: u32,
+    /// The fractional part of the MJD.
     pub mjd_frac: f64,
-    pub error: f64,
+    /// The error in MJD.
+    pub mjd_error: f64,
 
+    /// The observation site identifier.
     pub site_id: String,
+    /// Any comments left in the line.
     pub comment: String,
  
-    pub flags: Vec<Flag>,
+    /// All flags found. Which flags are used depends on the file's creator, 
+    /// but they are all put as either of two versions: `f64` and `String`. 
+    pub flags: HashMap<String, Flag>,
 }
 impl TOAInfo {
     /// Reads in tempo2 format. Comments are a little more allwoing than should
@@ -90,8 +102,7 @@ impl TOAInfo {
 
         let flags = chunks
             .map(|s| parse_flag(s[0], s[1]))
-            .collect::<Vec<_>>();
-
+            .collect::<HashMap<String, Flag>>();
 
         Ok(Self {
             is_bad,
@@ -99,7 +110,7 @@ impl TOAInfo {
             frequency,
             mjd_int,
             mjd_frac,
-            error,
+            mjd_error: error,
             site_id,
             comment,
             flags,
@@ -129,7 +140,7 @@ impl TOAInfo {
     }
 }
 
-fn parse_flag(key: &str, value: &str) -> Flag {
+fn parse_flag(key: &str, value: &str) -> (String, Flag) {
     let key = 
     if key.starts_with("-") {
         key[1..].to_string()
@@ -139,21 +150,20 @@ fn parse_flag(key: &str, value: &str) -> Flag {
     };
 
     let value = match parse_f64(value) {
-        Ok(v) => FlagValue::Double(v),
-        Err(_) => FlagValue::String(value.to_string()),
+        Ok(v) => Flag::Double(v),
+        Err(_) => Flag::String(value.to_string()),
     };
 
-    Flag {
+    (
         key,
         value,
-    }
+    )
 }
 
-pub struct Flag {
-    pub key: String,
-    pub value: FlagValue,
-}
-pub enum FlagValue {
+/// A TOA flag value.
+pub enum Flag {
+    /// Double precision value, or integers, if present.
     Double(f64),
+    /// Anything that could not be cast to `f64`.
     String(String),
 }

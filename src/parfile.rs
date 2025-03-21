@@ -1,14 +1,59 @@
+//! Proveds a RW interface for `.par` files.
+//! 
+//! # Examples
+//! 
+//! ```
+//! # use psrutils::parfile::Parfile;
+//! # use psrutils::parfile::FittedParameterValue;
+//! # use psrutils::data_types::J2000Ra;
+//! # fn test() -> Result<(), psrutils::error::PsruError> {
+//! let par_text = "
+//!     PSR    J0000-9999\n\
+//!     RA     23:59:59.999\n\
+//!     DEC    45:59:59.999\n\
+//!     PEPOCH 55000\n\
+//!     F0     9001 1 0.0001\n\
+//!     DM     1001.1
+//! ".as_bytes();
+//! 
+//! let par = Parfile::read(std::io::BufReader::new(par_text))?;
+//! 
+//! // This is the name
+//! let name_par = &par.texts[0];
+//! 
+//! assert_eq!(name_par.name(), "PSR");
+//! assert_eq!(name_par.value(), "J0000-9999");
+//! 
+//! // This is the right ascension
+//! let ra = J2000Ra::new(23, 59, 59.999).unwrap();
+//! let fpv = FittedParameterValue::JustValue(ra);
+//! assert_eq!(&fpv, par.ra.value());
+//! 
+//! // This is the fundamental frequency
+//! let f0_par = &par.parameters[1];
+//! let fpv = FittedParameterValue::FitInfo{
+//!     value: 9001.0,
+//!     fit: true,
+//!     error: 0.0001,
+//! };
+//! assert_eq!(f0_par.name(), "F0");
+//! assert_eq!(f0_par.value(), &fpv);
+//! 
+//! # Ok(())
+//! }
+//! ```
+
 use std::io::{BufRead, Write};
 
 pub use glitch::Glitch;
 pub use jump::Jump;
 pub use parameters::{
     Parameter,
-    FittedParameter, 
     FittedParameterValue, 
-    J2000Fit
 };
 use parameters::{
+    FittedParameter, 
+    J2000Fit,
     parse_coord, 
     parse_count, 
     parse_fitted, 
@@ -24,6 +69,8 @@ mod glitch;
 mod jump;
 mod tests;
 
+/// Time ephemeris used.
+#[allow(missing_docs)]
 #[derive(Debug, Default, PartialEq)]
 pub enum TimeEphemeris {
     #[default]
@@ -32,6 +79,8 @@ pub enum TimeEphemeris {
     IF99,
     FB90
 }
+/// Binary model used.
+#[allow(missing_docs)]
 #[derive(Debug, Default, PartialEq)]
 pub enum BinaryModel {
     #[default]
@@ -42,6 +91,8 @@ pub enum BinaryModel {
     DD,
     MSS,
 }
+/// T2C method used.
+#[allow(missing_docs)]
 #[derive(Debug, Default, PartialEq)]
 pub enum T2CMethod {
     #[default]
@@ -50,6 +101,8 @@ pub enum T2CMethod {
     IAU2000B,
     TEMPO
 }
+/// Error mode used.
+#[allow(missing_docs)]
 #[derive(Debug, Default, PartialEq)]
 pub enum ErrorMode {
     #[default]
@@ -58,6 +111,8 @@ pub enum ErrorMode {
     Mode0,
     Mode1,
 }
+/// Units used.
+#[allow(missing_docs)]
 #[derive(Debug, Default, PartialEq)]
 pub enum Units {
     #[default]
@@ -142,7 +197,7 @@ impl Parfile {
     /// Writes itself to a stream. 
     /// 
     /// Note that the order of parameters and whitespace may differ from any
-    /// input file used to construct it, but will be consistent.
+    /// input file used to construct it, but the contents will be consistent.
     pub fn write(&self, writer: &mut impl Write) -> Result<(), PsruError> {
         self.check()?;
 

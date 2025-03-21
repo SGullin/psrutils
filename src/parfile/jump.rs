@@ -5,8 +5,13 @@ use crate::parse_tools::parse_bool;
 /// Add a constant oﬀset between specified TOAs.
 #[derive(Debug)]
 pub struct Jump {
-    pub selector: JumpType,
+    /// What flag was used to id the jump arguments.
+    pub jtype: JumpType,
+
+    /// The jump size.
     pub value: f64,
+
+    /// Fitting status.
     pub fit: bool,
 }
 
@@ -54,7 +59,7 @@ impl Jump {
         };
 
         let jump = Jump {
-            selector,
+            jtype: selector,
             value: parse_f64(parts.next().ok_or_else(error)?)?,
             fit: parse_bool(parts.next().ok_or_else(error)?)?,
         };
@@ -65,7 +70,7 @@ impl Jump {
     
     pub(crate) fn write(&self) -> String {
         let mut line = String::from("JUMP");
-        match &self.selector {
+        match &self.jtype {
             JumpType::MJD(v1, v2) => line += &format!("MJD {} {}", v1, v2),
             JumpType::FREQ(v1, v2) => line += &format!("FREQ {} {}", v1, v2),
             JumpType::TEL(id) => line += &format!("TEL {}", id),

@@ -15,6 +15,9 @@ The `parfile` module takes care of reading, representing, and writing `.par` fil
 The `timfile` module contains a method for reading `.tim` files, yielding a `Vec<TOAInfo>`. This recursively reads any other files included with the `INCLUDE` keyword.
 
 # Changelog
+## v 0.2.3
+ * Added `TOAInfo::from_line_tmepo2` to read from a line, instead of needing a whole .tim-file.
+
 ## v 0.2.2
  * Added module `data_types`, and J2000 coordinate types within.
  * Fixed visibility issues.

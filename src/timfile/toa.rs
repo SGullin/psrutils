@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::error::PsruError;
 use crate::parse_tools::*;
 
+#[derive(Debug, PartialEq)]
 /// The basic information contained in a calculated TOA.
 pub struct TOAInfo {
     /// Whether the TOA is marked as bad.
@@ -30,6 +31,34 @@ pub struct TOAInfo {
     pub flags: HashMap<String, Flag>,
 }
 impl TOAInfo {
+    /// Parses a single line of .tim-file information in TEMPO2-style.
+    /// 
+    /// ```
+    /// # use psrutils::timfile::{TOAInfo, Flag};
+    /// # use std::collections::HashMap;
+    /// let line = "fname 1.0 55.0 0.0 st -flag value -flag2 42";
+    /// let info = TOAInfo::from_line_tempo2(line).unwrap();
+    /// let toa = TOAInfo {
+    ///     is_bad: false,
+    ///     file: String::from("fname"),
+    ///     frequency: 1.0,
+    ///     mjd_int: 55,
+    ///     mjd_frac: 0.0,
+    ///     mjd_error: 0.0,
+    ///     site_id: String::from("st"),
+    ///     flags: HashMap::from([
+    ///         (String::from("flag"), Flag::String(String::from("value"))),
+    ///         (String::from("flag2"), Flag::Double(42.0)),
+    ///     ]),
+    ///     comment: String::new(),
+    /// };
+    /// assert_eq!(info, toa);
+    /// ```
+    pub fn from_line_tempo2(line: &str) -> Result<Self, PsruError> {
+        let parts = line.split_ascii_whitespace().collect::<Vec<_>>();
+        Self::parse_tempo2(&parts)
+    }
+
     /// Reads in tempo2 format. Comments are a little more allwoing than should
     /// be...
     pub(crate) fn parse_tempo2(parts: &[&str]) -> Result<Self, PsruError> {
@@ -81,14 +110,14 @@ impl TOAInfo {
             .ok_or(PsruError::TimUnexpectedEOL(None))?
             .to_string();
 
-        println!(
-            "{} {} {}.{} {} {}",
-            file,
-            frequency,
-            mjd_int, mjd_frac,
-            error,
-            site_id,
-        );
+        // println!(
+        //     "{} {} {}.{} {} {}",
+        //     file,
+        //     frequency,
+        //     mjd_int, mjd_frac,
+        //     error,
+        //     site_id,
+        // );
 
         // Flags come in key-value pairs
         let remains = values.collect::<Vec<_>>();
@@ -160,6 +189,7 @@ fn parse_flag(key: &str, value: &str) -> (String, Flag) {
     )
 }
 
+#[derive(Debug, PartialEq)]
 /// A TOA flag value.
 pub enum Flag {
     /// Double precision value, or integers, if present.

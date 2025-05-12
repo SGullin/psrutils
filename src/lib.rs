@@ -6,6 +6,7 @@
 pub(crate) mod parse_tools;
 
 pub mod error;
+pub mod data_types;
 pub mod parfile;
 pub mod timfile;
-pub mod data_types;
+pub mod fits;

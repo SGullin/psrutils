@@ -1,6 +1,6 @@
 [package]
 name = "psrutils"
-version = "0.2.5"
+version = "0.2.6"
 edition = "2024"
 authors = ["Samuel Gullin <gullin@ia.forth.gr>"]
 license = "MIT OR Apache-2.0"

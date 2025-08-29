@@ -9,10 +9,10 @@ pub type J2000Ra = J2000Coord<RACoordType>;
 pub type J2000Dec = J2000Coord<DECCoordType>;
 
 /// Empty struct to define RA coords, see [`J2000Coord<RACoordType>`].
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct RACoordType;
 /// Empty struct to define DEC coords, see [`J2000Coord<DECCoordType>`].
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct DECCoordType;
 
 /// A J2000 coordinate. Comes in two variants, ra and dec, both using the same
@@ -42,7 +42,7 @@ impl FromStr for J2000Coord<RACoordType> {
     type Err = PsruError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let coord_parts = s.split(":").collect::<Vec<_>>();
+        let coord_parts = s.split(':').collect::<Vec<_>>();
         if coord_parts.len() != 3 {
             return Err(PsruError::InvalidRA(s.to_string()));
         }
@@ -71,7 +71,7 @@ impl FromStr for J2000Coord<DECCoordType> {
     type Err = PsruError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let coord_parts = s.split(":").collect::<Vec<_>>();
+        let coord_parts = s.split(':').collect::<Vec<_>>();
         if coord_parts.len() != 3 {
             return Err(PsruError::InvalidRA(s.to_string()));
         }
@@ -99,6 +99,7 @@ impl FromStr for J2000Coord<DECCoordType> {
 impl J2000Coord<RACoordType> {
     /// Construct a new ra coordinate. 
     /// 
+    /// # Errors
     /// Returns an error for values out of bounds.
     /// 
     /// # Examples
@@ -136,6 +137,7 @@ impl J2000Coord<RACoordType> {
 impl J2000Coord<DECCoordType> {
     /// Construct a new dec coordinate. 
     /// 
+    /// # Errors
     /// Returns an error for values out of bounds.
     /// 
     /// # Examples
@@ -183,8 +185,8 @@ impl<T> J2000Coord<T> {
     /// assert_eq!(ra_f64, 12.5);
     /// ```
     pub fn as_f64(&self) -> f64 {
-        self.major as f64
-        + self.minutes as f64 / 60.0
+        f64::from(self.major)
+        + f64::from(self.minutes) / 60.0
         + self.seconds / 3600.0
     }
 }

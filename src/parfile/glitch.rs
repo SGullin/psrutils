@@ -5,7 +5,7 @@ use crate::parse_tools::parse_f64;
 /// from the source, but it should be noted that the reader expects a 
 /// non-disjuct range of indices, once everything's been read.
 /// 
-/// If e.g. "GLF1_2" shows up, we assume there should also be a glitch 1 
+/// If e.g. `GLF1_2` shows up, we assume there should also be a glitch 1 
 /// before it, but perhaps written later, so we presumptiously add it. If 
 /// there is no glitch 1, that produces a warning in the end of the `read`
 /// function. If there is not enough data to fully define a glitch, it is 
@@ -31,32 +31,44 @@ pub struct Glitch {
 impl Glitch {
     /// This will parse one glitch parameter, since there does not seem to be 
     /// any restrictions on where these paramaters may occur in the file.
-    pub(crate) fn parse(parts: &[&str], glitches: &mut Vec<Glitch>) -> Result<bool, PsruError> {
-        let p0ps = parts[0].split("_").collect::<Vec<_>>();
+    pub(crate) fn parse(
+        parts: &[&str], 
+        glitches: &mut Vec<Self>
+    ) -> Result<bool, PsruError> {
+        if parts.len() != 2 {
+            return Ok(false);
+        }
+        let value = parts[1];
+
+        let p0ps = parts[0].split('_').collect::<Vec<_>>();
         if p0ps.len() != 2 {
             return Ok(false);
         }
+        let key = p0ps[0].to_uppercase();
 
-        if !["glep","glph","glf0","glf1","glf0d","gltd"].contains(&p0ps[0]) {
-            return Ok(false);
-        }
+        if !["GLEP", "GLPH", "GLF0", "GLF1", "GLF0D", "GLTD"]
+            .contains(&key.as_str()) {
+                return Ok(false);
+            }
         
-        let index = p0ps[1]
+        let index = p0ps[1];
+        
+        let index = index
         .parse::<usize>()
         .map_err(|_| PsruError::Unparsable { 
-            value: p0ps[0].to_string(), 
+            value: index.to_string(), 
             to_type: "glitch index",
         })?;
-        let value = parse_f64(parts[1])?;
+        let value = parse_f64(value)?;
 
         // Make sure there are glitches for all indicated slots...
         while glitches.len() <= index {
-            glitches.push(Glitch::default());
+            glitches.push(Self::default());
         }
 
         let glitch = glitches.get_mut(index).unwrap();
 
-        match p0ps[0] {
+        match key.as_str() {
             "GLEP" => glitch.epoch = value,
             "GLPH" => glitch.phase = value,
             "GLF0" => glitch.f0 = value,

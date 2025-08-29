@@ -1,3 +1,4 @@
 /target
 *.par
 /testing
+.DS_STORE

@@ -121,5 +121,5 @@ fn write_read_invariance() {
     par.write(&mut writer).unwrap();
     let dst = writer.into_inner().unwrap();
 
-    assert_eq!(src, dst)
+    assert_eq!(src, dst);
 }

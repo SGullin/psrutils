@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use crate::data_types::J2000Coord;
 use crate::error::PsruError;
-use crate::parse_tools::*;
+use crate::parse_tools::{parse_f64, parse_bool, parse_u32};
 
 type Result<T> = std::result::Result<T, PsruError>;
 
@@ -36,16 +36,16 @@ pub struct Parameter<T> {
 impl<T> Parameter<T> {
     /// The name of the parameter, i.e. a functioning key, and not necessarily
     /// the most readable thing.
-    pub fn name(&self) -> &str { self.name }
+    pub const fn name(&self) -> &str { self.name }
 
     /// A description of the parameter, if it has one. Most entries are based 
     /// on the Tempo2 manual.
-    pub fn description(&self) -> &str { self.description }
+    pub const fn description(&self) -> &str { self.description }
 
     /// The value recorded.
-    pub fn value(&self) -> &T { &self.value }
+    pub const fn value(&self) -> &T { &self.value }
     
-    pub(crate) fn new(
+    pub(crate) const fn new(
         data: &(&'static str, &[&str], &'static str), 
         value: T,
     ) -> Self {
@@ -63,20 +63,20 @@ where T: std::fmt::Display {
             FittedParameterValue::Missing => write!(f, "MISSING"),
             FittedParameterValue::FitInfo { value, fit, error } => write!(
                 f,
-                "{} {} {} {}\n",
+                "{} {} {} {}",
                 self.name,
                 value,
                 if *fit {"1"} else {"0"},
                 error,
             ),
-            FittedParameterValue::JustValue(v) => write!(f, "{} {}\n", self.name, v),
+            FittedParameterValue::JustValue(v) => write!(f, "{} {}", self.name, v),
         }
     }
 }
 
 
-pub(crate) type FittedParameter = Parameter<FittedParameterValue<f64>>;
-pub(crate) type J2000Fit<T> = FittedParameterValue<J2000Coord<T>>;
+pub type FittedParameter = Parameter<FittedParameterValue<f64>>;
+pub type J2000Fit<T> = FittedParameterValue<J2000Coord<T>>;
 
 pub(super) fn parse_coord<T>(
     value: &str, 
@@ -87,8 +87,8 @@ where J2000Coord<T>: FromStr,
     let coord = value.parse::<J2000Coord<T>>().map_err(Into::into)?;
 
     let fit_info = if parts.len() > 3 {
-        let fit = parse_bool(&parts[2])?;
-        let error = parse_f64(&parts[3])?;
+        let fit = parse_bool(parts[2])?;
+        let error = parse_f64(parts[3])?;
         FittedParameterValue::FitInfo { value: coord, fit, error }
     } else {
         FittedParameterValue::JustValue(coord)
@@ -111,16 +111,13 @@ pub(super) fn parse_fitted(
         value: FittedParameterValue::JustValue(0.0),
     });
     
-    let mut param = match param {
-        Some(p) => p,
-        None => return Ok(None),
-    };
+    let Some(mut param) = param else { return Ok(None) };
     
-    let value = parse_f64(&parts[1])?;
+    let value = parse_f64(parts[1])?;
     
     let fit_info = if parts.len() > 3 {
-        let fit = parse_bool(&parts[2])?;
-        let error = parse_f64(&parts[3])?;
+        let fit = parse_bool(parts[2])?;
+        let error = parse_f64(parts[3])?;
         FittedParameterValue::FitInfo { value, fit, error }
     } else {
         FittedParameterValue::JustValue(value)
@@ -142,10 +139,7 @@ pub(super) fn parse_flag(parts: &[&str]) -> Result<Option<Parameter<bool>>> {
             value: true,
         });
    
-    let mut flag = match flag {
-        Some(p) => p,
-        None => return Ok(None),
-    };
+    let Some(mut flag) = flag else { return Ok(None) };
 
     flag.value = parse_bool(parts[1])?;
 
@@ -178,7 +172,7 @@ pub(super) fn parse_text(parts: &[&str]) -> Result<Option<Parameter<String>>> {
 }
 
 /// All documented parfile parameters with f64 values.
-pub(crate) const PARAMETERS: &[(&str, &[&str], &str)] = &[
+const PARAMETERS: &[(&str, &[&str], &str)] = &[
     ("F0", &[],                 "The rotational frequency (Hz)"),
     ("F1", &[],                 "The 1st time derivative of the rotational frequency (Hz / s)"),
     ("F2", &[],                 "The 2nd time derivative of the rotational frequency (Hz / s^2)"),
@@ -267,14 +261,14 @@ pub(crate) const PARAMETERS: &[(&str, &[&str], &str)] = &[
 ];
 
 /// All documented parfile parameters with u32 values.
-pub(crate) const PARAMETERS_U32: &[(&str, &[&str], &str)] = &[
+const PARAMETERS_U32: &[(&str, &[&str], &str)] = &[
     ("NITS", &[],  "Number of iterations for the fitting routines"),
     ("IBOOT", &[], "Number of iterations used in the bootstrap fitting method"),
     ("NTOA", &[],  "Number of TOAs"),
 ];
 
 /// All documented parfile parameters with String values.
-pub(crate) const TEXTS: &[(&str, &[&str], &str)] = &[
+const TEXTS: &[(&str, &[&str], &str)] = &[
     ("PSR", &["PSRJ", "PSRB"],  "Definition of clock to use"),
     ("CLK", &[],                "Definition of clock to use"),
     ("CLK_CORR_CHAIN", &[],     "Clock correction chain(s) to use"),
@@ -288,7 +282,7 @@ pub(crate) const TEXTS: &[(&str, &[&str], &str)] = &[
 ];
 
 /// All documented parfile flags.
-pub(crate) const FLAGS: &[(&str, &[&str], &str)] = &[
+const FLAGS: &[(&str, &[&str], &str)] = &[
     ("TEMPO1", &[],                 "Whether to run in tempo emulation mode: e.g. TDB units (Default=false)"),
     ("NOTRACK", &[],                "Switch oﬀ tracking mode"),
     ("NO_SS_SHAPIRO", &[],          "Switch oﬀ the calculation of the Solar system Shapiro delay"),
@@ -300,7 +294,7 @@ pub(crate) const FLAGS: &[(&str, &[&str], &str)] = &[
 ];
 
 /// Special ones. These are the only ones to have duplicate aliases...
-pub(crate) const COORDS: &[(&str, &[&str], &str)] = &[
+pub const COORDS: &[(&str, &[&str], &str)] = &[
     ("RA", &["RA", "RAJ"],     "J2000 right ascension"),
     ("DEC", &["DEC", "DECJ"],  "J2000 declination"),
 ];

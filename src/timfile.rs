@@ -1,6 +1,6 @@
 //! Allows for reading the data of `.tim` files.
 
-use std::{fs::File, io::{BufRead, BufReader}, path::PathBuf};
+use std::{fs::File, io::{BufRead, BufReader}, path::{Path, PathBuf}};
 use crate::error::{PsruError, TimContext};
 
 pub use toa::*;
@@ -12,17 +12,23 @@ mod tests;
 /// flags without values, and malformed entries.
 /// 
 /// Currently, the only implemented format is for Tempo2.
-pub fn read_tim(path: PathBuf, format: TimFormat) -> Result<Vec<TOAInfo>, PsruError> {
+/// 
+/// # Errors
+/// Will throw errors for bad files or contents.
+pub fn read_tim(path: &Path, format: TimFormat) -> Result<Vec<TOAInfo>, PsruError> {
     let mut toa_infos = Vec::new();
 
-    let file = File::open(path.clone()).map_err(PsruError::IOError)?;
+    let file = File::open(path)?;
     let reader = BufReader::new(file);
 
-    let directory = path.parent().unwrap().to_path_buf();
+    let directory = path
+        .parent()
+        .ok_or(PsruError::OrphanFile)?
+        .to_path_buf();
     let mut ctx = TimContext::new(&path.to_string_lossy(), 0);
 
     for (line_number, result) in reader.lines().enumerate() {
-        let line = result.map_err(PsruError::IOError)?;
+        let line = result?;
         if line.is_empty() { continue; }
         
         ctx.line(line_number + 1);
@@ -44,7 +50,7 @@ fn parse_line(
 
     if parts[0] == "INCLUDE" {
         directory.push(parts[1]);
-        let mut nested_tim = read_tim(directory, mode)?;
+        let mut nested_tim = read_tim(&directory, mode)?;
         
         toa_infos.append(&mut nested_tim);
         return Ok(())
@@ -74,7 +80,7 @@ fn parse_line(
     Ok(())
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 /// The format used for parsing TOAs in .tim files.
 pub enum TimFormat {
     /// Read `.tim` files the way Tempo2 likes it.

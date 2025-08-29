@@ -22,9 +22,10 @@ fn t2_incomplete() {
             .map(|a| *a.1)
             .collect::<Vec<_>>();
         
-        if TOAInfo::parse_tempo2(&line).is_ok() {
-            panic!("'{}' should fail", line.join(" "));
-        }
+        assert!(
+            TOAInfo::parse_tempo2(&line).is_err(), 
+            "'{}' should fail", line.join(" "),
+        );
     }
 }
 #[test]

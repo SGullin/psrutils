@@ -43,7 +43,7 @@
 //! }
 //! ```
 
-use std::io::{BufRead, Write};
+use std::io::{BufRead, BufWriter, Write};
 
 pub use glitch::Glitch;
 pub use jump::Jump;
@@ -71,7 +71,7 @@ mod tests;
 
 /// Time ephemeris used.
 #[allow(missing_docs)]
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub enum TimeEphemeris {
     #[default]
     Unstated,
@@ -81,7 +81,7 @@ pub enum TimeEphemeris {
 }
 /// Binary model used.
 #[allow(missing_docs)]
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub enum BinaryModel {
     #[default]
     Unstated,
@@ -93,7 +93,7 @@ pub enum BinaryModel {
 }
 /// T2C method used.
 #[allow(missing_docs)]
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub enum T2CMethod {
     #[default]
     Unstated,
@@ -103,7 +103,7 @@ pub enum T2CMethod {
 }
 /// Error mode used.
 #[allow(missing_docs)]
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub enum ErrorMode {
     #[default]
     Unstated,
@@ -113,7 +113,7 @@ pub enum ErrorMode {
 }
 /// Units used.
 #[allow(missing_docs)]
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub enum Units {
     #[default]
     Unstated,
@@ -173,18 +173,22 @@ pub struct Parfile {
 }
 
 impl Parfile {
-    /// Reads a stream as a .par file. Returns errors for malformed entries,
+    /// Reads a `BufReader` as a .par file. 
+    /// 
+    /// # Errors
+    /// Returns errors for malformed entries,
     /// duplicate entries, missing mandatory parameters, and some 
     /// out-of-bounds values.
     /// 
+    /// # Notes
     /// Most parameters are `f64` values, but some are `String`, a couple are
     /// `u32`, and a few have their own enums to avoid excessive `String` 
     /// usage.
     pub fn read(reader: impl BufRead) -> Result<Self, PsruError> {
-        let mut par = Parfile::default();
+        let mut par = Self::default();
 
         for result in reader.lines() {
-            let line = result.map_err(PsruError::IOError)?;
+            let line = result?;
             if line.is_empty() { continue; }
             par.parse_line(&line)?;
         }
@@ -198,8 +202,14 @@ impl Parfile {
     /// 
     /// Note that the order of parameters and whitespace may differ from any
     /// input file used to construct it, but the contents will be consistent.
+    /// 
+    /// # Errors
+    /// Most opportunities for erros come from calls to `write_all`, but it 
+    /// will also throw an error if your .par file is missing a `name` 
+    /// parameter.
     pub fn write(&self, writer: &mut impl Write) -> Result<(), PsruError> {
         self.check()?;
+        let mut writer = BufWriter::new(writer);
 
         // It's nice to put the name up top, even though it is a regular text
         // parameter... so we extract it here.
@@ -215,30 +225,29 @@ impl Parfile {
         let name = texts.remove(name_index);
 
         // The special fields
-        for line in vec![
-            format!("PSR {}\n", name.value()),
-            format!("{}\n", self.ra),
-            format!("{}\n", self.dec),
-        ] {
-            writer.write(line.as_bytes()).map_err(PsruError::IOError)?;
-        }
+        let intro = format!(
+            "PSR {}\n{}\n{}\n", 
+            name.value(), 
+            self.ra, 
+            self.dec,
+        );
+        writer.write_all(intro.as_bytes())?;
 
         // Double params
         for parameter in &self.parameters {
-            writer.write(parameter.to_string().as_bytes())
-                .map_err(PsruError::IOError)?;
+            writer.write_all(format!("{parameter}\n").as_bytes())?;
         }
 
         // Integer params
         for parameter in &self.counts {
-            let line =  format!("{} {}\n", parameter.name(), parameter.value());
-            writer.write(line.as_bytes()).map_err(PsruError::IOError)?;
+            let line = format!("{} {}\n", parameter.name(), parameter.value());
+            writer.write_all(line.as_bytes())?;
         }
 
         // String params
         for parameter in texts {
-            let line =  format!("{} {}\n", parameter.name(), parameter.value());
-            writer.write(line.as_bytes()).map_err(PsruError::IOError)?;
+            let line = format!("{} {}\n", parameter.name(), parameter.value());
+            writer.write_all(line.as_bytes())?;
         }
 
         // Flags
@@ -251,53 +260,45 @@ impl Parfile {
                     false => "N\n",
                 }
             );
-            writer.write(line.as_bytes()).map_err(PsruError::IOError)?;
+            writer.write_all(line.as_bytes())?;
         }
 
         // Oddballs
         if self.time_eph != TimeEphemeris::Unstated {
             let line = format!("TIMEEPH {:?}\n", self.time_eph);
-            writer.write(line.as_bytes())
-                .map_err(PsruError::IOError)?;
+            writer.write_all(line.as_bytes())?;
         }
         if self.binary_model != BinaryModel::Unstated {
             let line = format!("MODEL {:?}\n", self.binary_model);
-            writer.write(line.as_bytes())
-                .map_err(PsruError::IOError)?;
+            writer.write_all(line.as_bytes())?;
         }
         if self.units != Units::Unstated {
             let line = format!("UNITS {:?}\n", self.units);
-            writer.write(line.as_bytes())
-                .map_err(PsruError::IOError)?;
+            writer.write_all(line.as_bytes())?;
         }
         if self.t2c_method != T2CMethod::Unstated {
             let line = format!("T2CMETHOD {:?}\n", self.t2c_method);
-            writer.write(line.as_bytes())
-                .map_err(PsruError::IOError)?;
+            writer.write_all(line.as_bytes())?;
         }
         match self.error_mode {
             ErrorMode::Unstated => {},
-            ErrorMode::Mode0 => {
-                writer.write("MODE 0\n".as_bytes())
-                    .map_err(PsruError::IOError)?;
-            },
-            ErrorMode::Mode1 => {
-                writer.write("MODE 1\n".as_bytes())
-                    .map_err(PsruError::IOError)?;
-            },
+            ErrorMode::Mode0 => writer.write_all(b"MODE 0\n")?,
+            ErrorMode::Mode1 => writer.write_all(b"MODE 1\n")?,
         }
 
         // Glitches
         for glitch in &self.glitches {
             let lines = glitch.write();
-            writer.write(lines.as_bytes()).map_err(PsruError::IOError)?;
+            writer.write_all(lines.as_bytes())?;
         }
 
         // Jumps
         for jump in &self.jumps {
             let line = jump.write();
-            writer.write(line.as_bytes()).map_err(PsruError::IOError)?;
+            writer.write_all(line.as_bytes())?;
         }
+
+        writer.flush()?;
 
         Ok(())
     }
@@ -438,40 +439,38 @@ impl Parfile {
     /// Performs a little check to see everything's ok.
     fn check(&self) -> Result<(), PsruError> {
         // Check mandatory params
-        if self.texts
+        if !self.texts
             .iter()
-            .find(|t| t.name() == "PSR")
-            .is_none() {
+            .any(|t| t.name() == "PSR") {
             return Err(PsruError::ParNoName);
         }
         self.parameters
             .iter()
             .find(|t| t.name() == "PEPOCH")
-            .map(|p| 
-                if match *p.value() {
+            .map_or_else(
+                || Err(PsruError::ParNoPEpoch),
+                |p| if match *p.value() {
                     FittedParameterValue::Missing => false,
-                    FittedParameterValue::JustValue(v) => v > 0.0,
+                    FittedParameterValue::JustValue(value) |
                     FittedParameterValue::FitInfo { value, .. } => value > 0.0,
                 }{ Ok(()) } else { Err(PsruError::ParBadPEpoch) }
-            )
-            .unwrap_or(Err(PsruError::ParNoPEpoch))?;
+            )?;
         
         self.parameters
             .iter()
             .find(|t| t.name() == "F0")
-            .map(|p| 
-                if match *p.value() {
+            .map_or_else(
+                || Err(PsruError::ParNoFrequency),
+                |p| if match *p.value() {
                     FittedParameterValue::Missing => false,
-                    FittedParameterValue::JustValue(v) => v > 0.0,
+                    FittedParameterValue::JustValue(value) |
                     FittedParameterValue::FitInfo { value, .. } => value > 0.0,
                 } { Ok(()) } else { Err(PsruError::ParBadFrequency) }
-            )
-            .unwrap_or(Err(PsruError::ParNoFrequency))?;
+            )?;
 
-        if self.parameters
+        if !self.parameters
             .iter()
-            .find(|t| t.name() == "DM")
-            .is_none() {
+            .any(|t| t.name() == "DM") {
             return Err(PsruError::ParNoDispersion);
         }
 

@@ -1,6 +1,7 @@
 //! Contains useful datatypes.
 
 mod j2000;
+mod mjd;
 mod tests;
 
 pub use j2000::{
@@ -10,3 +11,4 @@ pub use j2000::{
     RACoordType,
     DECCoordType,
 };
+pub use mjd::Mjd;

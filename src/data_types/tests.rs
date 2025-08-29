@@ -13,9 +13,7 @@ fn ra_dec_coords() {
         "05:59:-2.999",
     ] {
         let c = ra.parse::<J2000Ra>();
-        if c.is_ok() { 
-            panic!("{} should not be ok as ra", ra);
-        }
+        assert!(c.is_err(), "{ra} should not be ok as ra");
     }
 
     for ra in [
@@ -27,7 +25,7 @@ fn ra_dec_coords() {
     ] {
         let c = ra.parse::<J2000Ra>();
         if let Err(err) = c { 
-            panic!("{}\n{} should be ok as ra", err, ra);
+            panic!("{err}\n{ra} should be ok as ra");
         }
     }
 
@@ -43,9 +41,7 @@ fn ra_dec_coords() {
         "05:59:-2.999",
     ] {
         let c = dec.parse::<J2000Dec>();
-        if c.is_ok() { 
-            panic!("{} should not be ok as dec", dec);
-        }
+        assert!(c.is_err(), "{dec} should not be ok as dec");
     }
 
     for dec in [
@@ -61,7 +57,7 @@ fn ra_dec_coords() {
     ] {
         let c = dec.parse::<J2000Dec>();
         if let Err(err) = c {
-            panic!("{}\n{} should be ok as dec", err, dec);
+            panic!("{err}\n{dec} should be ok as dec");
         }
     }
 }

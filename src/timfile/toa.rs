@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
+use crate::data_types::Mjd;
 use crate::error::PsruError;
-use crate::parse_tools::*;
+use crate::parse_tools::parse_f64;
 
 #[derive(Debug, PartialEq)]
 /// The basic information contained in a calculated TOA.
@@ -14,10 +15,8 @@ pub struct TOAInfo {
     /// Observation frequency.
     pub frequency: f64,
 
-    /// The integer part of the MJD.
-    pub mjd_int: u32,
-    /// The fractional part of the MJD.
-    pub mjd_frac: f64,
+    /// The date-time.
+    pub mjd: Mjd,
     /// The error in MJD.
     pub mjd_error: f64,
 
@@ -33,8 +32,12 @@ pub struct TOAInfo {
 impl TOAInfo {
     /// Parses a single line of .tim-file information in TEMPO2-style.
     /// 
+    /// # Errors 
+    /// Returns errors for any malformed parameters.
+    /// 
     /// ```
     /// # use psrutils::timfile::{TOAInfo, Flag};
+    /// # use psrutils::data_types::Mjd;
     /// # use std::collections::HashMap;
     /// let line = "fname 1.0 55.0 0.0 st -flag value -flag2 42";
     /// let info = TOAInfo::from_line_tempo2(line).unwrap();
@@ -42,8 +45,7 @@ impl TOAInfo {
     ///     is_bad: false,
     ///     file: String::from("fname"),
     ///     frequency: 1.0,
-    ///     mjd_int: 55,
-    ///     mjd_frac: 0.0,
+    ///     mjd: Mjd::new(55, 0.0),
     ///     mjd_error: 0.0,
     ///     site_id: String::from("st"),
     ///     flags: HashMap::from([
@@ -65,7 +67,7 @@ impl TOAInfo {
         let is_bad = parts[0] == "c" || parts[0] == "C";
         let (mut comments, mut values): (Vec<&str>, Vec<&str>) = parts
             .iter()
-            .partition(|w| w.starts_with("#") && w.len() > 1);
+            .partition(|w| w.starts_with('#') && w.len() > 1);
         
         if let Some(pos) = values.iter().position(|w| *w == "#") {
             values
@@ -87,37 +89,22 @@ impl TOAInfo {
         let freq_text = values
             .next()
             .ok_or(PsruError::TimUnexpectedEOL(None))?;
-        let frequency = parse_f64(&freq_text)?;
+        let frequency = parse_f64(freq_text)?;
 
         let mjd_text = values
             .next()
-            .ok_or(PsruError::TimUnexpectedEOL(None))?
-            .split(".")
-            .collect::<Vec<_>>();
-        if mjd_text.len() != 2 {
-            return Err(PsruError::TimMalformedMJD(None));
-        }
-        let mjd_int = parse_u32(mjd_text[0])?;
-        let mjd_frac = parse_f64(&format!("0.{}", mjd_text[1]))?;
+            .ok_or(PsruError::TimUnexpectedEOL(None))?;
+        let mjd = mjd_text.parse::<Mjd>()?;
 
         let err_text = values
             .next()
             .ok_or(PsruError::TimUnexpectedEOL(None))?;
-        let error = parse_f64(&err_text)?;
+        let error = parse_f64(err_text)?;
 
         let site_id = values
             .next()
             .ok_or(PsruError::TimUnexpectedEOL(None))?
             .to_string();
-
-        // println!(
-        //     "{} {} {}.{} {} {}",
-        //     file,
-        //     frequency,
-        //     mjd_int, mjd_frac,
-        //     error,
-        //     site_id,
-        // );
 
         // Flags come in key-value pairs
         let remains = values.collect::<Vec<_>>();
@@ -137,8 +124,7 @@ impl TOAInfo {
             is_bad,
             file,
             frequency,
-            mjd_int,
-            mjd_frac,
+            mjd,
             mjd_error: error,
             site_id,
             comment,
@@ -170,18 +156,14 @@ impl TOAInfo {
 }
 
 fn parse_flag(key: &str, value: &str) -> (String, Flag) {
-    let key = 
-    if key.starts_with("-") {
-        key[1..].to_string()
-    } 
-    else {
-        key.to_string()
-    };
+    let key = key
+        .strip_prefix('-')
+        .map_or_else(|| key.to_string(), str::to_string);
 
-    let value = match parse_f64(value) {
-        Ok(v) => Flag::Double(v),
-        Err(_) => Flag::String(value.to_string()),
-    };
+    let value = parse_f64(value).map_or_else(
+        |_| Flag::String(value.to_string()), 
+        Flag::Double,
+    );
 
     (
         key,

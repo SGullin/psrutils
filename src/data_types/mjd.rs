@@ -58,4 +58,14 @@ impl Mjd {
     pub const fn to_f64(&self) -> f64 {
         self.int as f64 + self.frac
     }
+
+    /// The integer part.
+    pub fn int_part(&self) -> u32 {
+        self.int
+    }
+
+    /// The fractional part, always in the range [0, 1).
+    pub fn frac_part(&self) -> f64 {
+        self.frac
+    }
 }

@@ -2,3 +2,4 @@
 *.par
 /testing
 .DS_STORE
+Cargo.lock

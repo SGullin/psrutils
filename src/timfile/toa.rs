@@ -24,17 +24,17 @@ pub struct TOAInfo {
     pub site_id: String,
     /// Any comments left in the line.
     pub comment: String,
- 
-    /// All flags found. Which flags are used depends on the file's creator, 
-    /// but they are all put as either of two versions: `f64` and `String`. 
+
+    /// All flags found. Which flags are used depends on the file's creator,
+    /// but they are all put as either of two versions: `f64` and `String`.
     pub flags: HashMap<String, Flag>,
 }
 impl TOAInfo {
     /// Parses a single line of .tim-file information in TEMPO2-style.
-    /// 
-    /// # Errors 
+    ///
+    /// # Errors
     /// Returns errors for any malformed parameters.
-    /// 
+    ///
     /// ```
     /// # use psrutils::timfile::{TOAInfo, Flag};
     /// # use psrutils::data_types::Mjd;
@@ -68,37 +68,35 @@ impl TOAInfo {
         let (mut comments, mut values): (Vec<&str>, Vec<&str>) = parts
             .iter()
             .partition(|w| w.starts_with('#') && w.len() > 1);
-        
+
         if let Some(pos) = values.iter().position(|w| *w == "#") {
-            values
-                .split_off(pos)[1..]
+            values.split_off(pos)[1..]
                 .iter()
                 .for_each(|c| comments.push(c));
         }
-        
+
         let comment = comments.join(" -- ");
         let mut values = values.into_iter();
 
-        if is_bad { _ = values.next(); }
+        if is_bad {
+            _ = values.next();
+        }
 
         let file = values
             .next()
             .ok_or(PsruError::TimUnexpectedEOL(None))?
             .to_string();
-        
-        let freq_text = values
-            .next()
-            .ok_or(PsruError::TimUnexpectedEOL(None))?;
+
+        let freq_text =
+            values.next().ok_or(PsruError::TimUnexpectedEOL(None))?;
         let frequency = parse_f64(freq_text)?;
 
-        let mjd_text = values
-            .next()
-            .ok_or(PsruError::TimUnexpectedEOL(None))?;
+        let mjd_text =
+            values.next().ok_or(PsruError::TimUnexpectedEOL(None))?;
         let mjd = mjd_text.parse::<Mjd>()?;
 
-        let err_text = values
-            .next()
-            .ok_or(PsruError::TimUnexpectedEOL(None))?;
+        let err_text =
+            values.next().ok_or(PsruError::TimUnexpectedEOL(None))?;
         let error = parse_f64(err_text)?;
 
         let site_id = values
@@ -112,7 +110,7 @@ impl TOAInfo {
         if !chunks.remainder().is_empty() {
             return Err(PsruError::TimUnvaluedFlag(
                 None,
-                chunks.remainder()[0].to_string()
+                chunks.remainder()[0].to_string(),
             ));
         }
 
@@ -131,7 +129,7 @@ impl TOAInfo {
             flags,
         })
     }
-    
+
     /// Not fully implemented.
     pub(crate) fn parse_parkes(line: &str) -> Result<Self, PsruError> {
         if !line.is_ascii() {
@@ -160,15 +158,10 @@ fn parse_flag(key: &str, value: &str) -> (String, Flag) {
         .strip_prefix('-')
         .map_or_else(|| key.to_string(), str::to_string);
 
-    let value = parse_f64(value).map_or_else(
-        |_| Flag::String(value.to_string()), 
-        Flag::Double,
-    );
+    let value = parse_f64(value)
+        .map_or_else(|_| Flag::String(value.to_string()), Flag::Double);
 
-    (
-        key,
-        value,
-    )
+    (key, value)
 }
 
 #[derive(Debug, PartialEq)]

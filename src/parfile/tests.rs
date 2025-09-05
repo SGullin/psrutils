@@ -1,7 +1,7 @@
 #[allow(unused)]
-use std::io::{BufReader, LineWriter};
-#[allow(unused)]
 use super::*;
+#[allow(unused)]
+use std::io::{BufReader, LineWriter};
 
 #[test]
 fn incomplete_parinfo() {
@@ -15,14 +15,15 @@ fn incomplete_parinfo() {
     ];
 
     for i in 2..6 {
-        let subset = minimal
-            .iter()
-            .enumerate()
-            .fold(String::new(), |a, (j, line)| 
-                if i==j { a }
-                else { a + line }
-            );
-        
+        let subset =
+            minimal
+                .iter()
+                .enumerate()
+                .fold(
+                    String::new(),
+                    |a, (j, line)| if i == j { a } else { a + line },
+                );
+
         let par = Parfile::read(BufReader::new(subset.as_bytes()));
         assert!(par.is_err());
     }
@@ -41,7 +42,7 @@ fn minimal_parinfo() {
 
     let par = Parfile::read(BufReader::new(minimal.as_bytes()));
     match par {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(err) => panic!("{}", err),
     }
 }

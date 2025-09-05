@@ -1,7 +1,7 @@
 //! Proveds a RW interface for `.par` files.
-//! 
+//!
 //! # Examples
-//! 
+//!
 //! ```
 //! # use psrutils::parfile::Parfile;
 //! # use psrutils::parfile::FittedParameterValue;
@@ -15,20 +15,20 @@
 //!     F0     9001 1 0.0001\n\
 //!     DM     1001.1
 //! ".as_bytes();
-//! 
+//!
 //! let par = Parfile::read(std::io::BufReader::new(par_text))?;
-//! 
+//!
 //! // This is the name
 //! let name_par = &par.texts[0];
-//! 
+//!
 //! assert_eq!(name_par.name(), "PSR");
 //! assert_eq!(name_par.value(), "J0000-9999");
-//! 
+//!
 //! // This is the right ascension
 //! let ra = J2000Ra::new(23, 59, 59.999).unwrap();
 //! let fpv = FittedParameterValue::JustValue(ra);
 //! assert_eq!(&fpv, par.ra.value());
-//! 
+//!
 //! // This is the fundamental frequency
 //! let f0_par = &par.parameters[1];
 //! let fpv = FittedParameterValue::FitInfo{
@@ -38,7 +38,7 @@
 //! };
 //! assert_eq!(f0_par.name(), "F0");
 //! assert_eq!(f0_par.value(), &fpv);
-//! 
+//!
 //! # Ok(())
 //! }
 //! ```
@@ -47,26 +47,20 @@ use std::io::{BufRead, BufWriter, Write};
 
 pub use glitch::Glitch;
 pub use jump::Jump;
-pub use parameters::{
-    Parameter,
-    FittedParameterValue, 
-};
 use parameters::{
-    FittedParameter, 
-    J2000Fit,
-    parse_coord, 
-    parse_count, 
-    parse_fitted, 
-    parse_flag, 
-    parse_text, 
-    COORDS
+    COORDS, FittedParameter, J2000Fit, parse_coord, parse_count, parse_fitted,
+    parse_flag, parse_text,
+};
+pub use parameters::{FittedParameterValue, Parameter};
+
+use crate::{
+    data_types::{DECCoordType, RACoordType},
+    error::PsruError,
 };
 
-use crate::{data_types::{DECCoordType, RACoordType}, error::PsruError};
-
-mod parameters;
 mod glitch;
 mod jump;
+mod parameters;
 mod tests;
 
 /// Time ephemeris used.
@@ -77,7 +71,7 @@ pub enum TimeEphemeris {
     Unstated,
 
     IF99,
-    FB90
+    FB90,
 }
 /// Binary model used.
 #[allow(missing_docs)]
@@ -99,7 +93,7 @@ pub enum T2CMethod {
     Unstated,
 
     IAU2000B,
-    TEMPO
+    TEMPO,
 }
 /// Error mode used.
 #[allow(missing_docs)]
@@ -124,16 +118,16 @@ pub enum Units {
 }
 
 /// Complete representation of a loaded .par file.
-/// 
+///
 /// It follows the loose standards of TEMPO2, and as such is guaranteed to have
-/// values for `PSR`, `F0`, `PEPOCH`, and `DM`. Some particular parameters 
-/// (e.g. `units`) are _not_ given default values when absent from a loaded 
-/// file, rather, they are set to `Unstated`. 
-/// 
+/// values for `PSR`, `F0`, `PEPOCH`, and `DM`. Some particular parameters
+/// (e.g. `units`) are _not_ given default values when absent from a loaded
+/// file, rather, they are set to `Unstated`.
+///
 /// Glitches and jumps are stored in vectors. Since glitches are multi-line
-/// parameters, they are kept track of with indices (e.g. `GLEP_1`) and 
+/// parameters, they are kept track of with indices (e.g. `GLEP_1`) and
 /// disjunct ranges are considered erroneous.
-/// 
+///
 /// All fields are public, since it is essentially just a datafile. There is,
 /// however, a check of all values performed before writing. A failure in this
 /// results in an error and no write.
@@ -144,7 +138,7 @@ pub struct Parfile {
     /// J2000 declination (dd:mm:ss.sss)
     pub dec: Parameter<J2000Fit<DECCoordType>>,
 
-    /// All double precision parameters, and optional data on whether to fit 
+    /// All double precision parameters, and optional data on whether to fit
     /// them, with errors. See `FittedParameter` for more info.
     pub parameters: Vec<FittedParameter>,
     /// All integer parameters.
@@ -160,10 +154,10 @@ pub struct Parfile {
     pub jumps: Vec<Jump>,
 
     /// Which time ephemeris to use
-    pub time_eph: TimeEphemeris, 
+    pub time_eph: TimeEphemeris,
     /// Binary model
     pub binary_model: BinaryModel,
-    /// Method for transforming from terrestrial to celestial frame 
+    /// Method for transforming from terrestrial to celestial frame
     pub t2c_method: T2CMethod,
 
     /// What units to use.
@@ -173,23 +167,25 @@ pub struct Parfile {
 }
 
 impl Parfile {
-    /// Reads a `BufReader` as a .par file. 
-    /// 
+    /// Reads a `BufReader` as a .par file.
+    ///
     /// # Errors
     /// Returns errors for malformed entries,
-    /// duplicate entries, missing mandatory parameters, and some 
+    /// duplicate entries, missing mandatory parameters, and some
     /// out-of-bounds values.
-    /// 
+    ///
     /// # Notes
     /// Most parameters are `f64` values, but some are `String`, a couple are
-    /// `u32`, and a few have their own enums to avoid excessive `String` 
+    /// `u32`, and a few have their own enums to avoid excessive `String`
     /// usage.
     pub fn read(reader: impl BufRead) -> Result<Self, PsruError> {
         let mut par = Self::default();
 
         for result in reader.lines() {
             let line = result?;
-            if line.is_empty() { continue; }
+            if line.is_empty() {
+                continue;
+            }
             par.parse_line(&line)?;
         }
 
@@ -198,14 +194,14 @@ impl Parfile {
         Ok(par)
     }
 
-    /// Writes itself to a stream. 
-    /// 
+    /// Writes itself to a stream.
+    ///
     /// Note that the order of parameters and whitespace may differ from any
     /// input file used to construct it, but the contents will be consistent.
-    /// 
+    ///
     /// # Errors
-    /// Most opportunities for erros come from calls to `write_all`, but it 
-    /// will also throw an error if your .par file is missing a `name` 
+    /// Most opportunities for erros come from calls to `write_all`, but it
+    /// will also throw an error if your .par file is missing a `name`
     /// parameter.
     pub fn write(&self, writer: &mut impl Write) -> Result<(), PsruError> {
         self.check()?;
@@ -213,24 +209,19 @@ impl Parfile {
 
         // It's nice to put the name up top, even though it is a regular text
         // parameter... so we extract it here.
-        let name_index = self.texts
+        let name_index = self
+            .texts
             .iter()
             .position(|t| t.name() == "PSR")
             .ok_or(PsruError::ParNoName)?;
 
-        let mut texts = self.texts
-            .iter()
-            .collect::<Vec<_>>();
-        
+        let mut texts = self.texts.iter().collect::<Vec<_>>();
+
         let name = texts.remove(name_index);
 
         // The special fields
-        let intro = format!(
-            "PSR {}\n{}\n{}\n", 
-            name.value(), 
-            self.ra, 
-            self.dec,
-        );
+        let intro =
+            format!("PSR {}\n{}\n{}\n", name.value(), self.ra, self.dec,);
         writer.write_all(intro.as_bytes())?;
 
         // Double params
@@ -252,9 +243,9 @@ impl Parfile {
 
         // Flags
         for parameter in &self.flags {
-            let line =  format!(
-                "{} {}", 
-                parameter.name(), 
+            let line = format!(
+                "{} {}",
+                parameter.name(),
                 match parameter.value() {
                     true => "Y\n",
                     false => "N\n",
@@ -281,7 +272,7 @@ impl Parfile {
             writer.write_all(line.as_bytes())?;
         }
         match self.error_mode {
-            ErrorMode::Unstated => {},
+            ErrorMode::Unstated => {}
             ErrorMode::Mode0 => writer.write_all(b"MODE 0\n")?,
             ErrorMode::Mode1 => writer.write_all(b"MODE 1\n")?,
         }
@@ -309,9 +300,15 @@ impl Parfile {
             return Err(PsruError::ParMissingValue(parts[0].to_string()));
         }
 
-        if Glitch::parse(&parts, &mut self.glitches)? { return Ok(()); }
-        if Jump::parse(&parts, &mut self.jumps)? { return Ok(()); }
-        if self.parse_special(&parts)? { return Ok(()); }
+        if Glitch::parse(&parts, &mut self.glitches)? {
+            return Ok(());
+        }
+        if Jump::parse(&parts, &mut self.jumps)? {
+            return Ok(());
+        }
+        if self.parse_special(&parts)? {
+            return Ok(());
+        }
 
         if let Some(flag) = parse_flag(&parts)? {
             self.flags.push(flag);
@@ -333,10 +330,7 @@ impl Parfile {
         Ok(())
     }
 
-    fn parse_special(
-        &mut self, 
-        parts: &[&str],
-    ) -> Result<bool, PsruError> {
+    fn parse_special(&mut self, parts: &[&str]) -> Result<bool, PsruError> {
         let key = parts[0];
         let value = parts[1];
 
@@ -350,31 +344,35 @@ impl Parfile {
                 &COORDS[0],
                 parse_coord::<RACoordType>(value, parts)?,
             );
-            
+
             return Ok(true);
         }
         if COORDS[1].1.contains(&key) {
-            if *self.dec.value() != FittedParameterValue::Missing { 
+            if *self.dec.value() != FittedParameterValue::Missing {
                 return Err(PsruError::ParRepeatParam(COORDS[1].0.to_string()));
             }
-            
+
             self.dec = Parameter::new(
                 &COORDS[1],
                 parse_coord::<DECCoordType>(value, parts)?,
             );
-            
+
             return Ok(true);
         }
 
         // Which time ephemeris to use (IF99/FB90)
         if "TIMEEPH" == key {
             if self.time_eph != TimeEphemeris::Unstated {
-                return Err(PsruError::ParRepeatParam(String::from("TIMEEPH")))
+                return Err(PsruError::ParRepeatParam(String::from("TIMEEPH")));
             }
             self.time_eph = match value {
                 "IF99" => TimeEphemeris::IF99,
                 "FB90" => TimeEphemeris::FB90,
-                other => return Err(PsruError::UnknownTimeEphemeris(other.to_string()))
+                other => {
+                    return Err(PsruError::UnknownTimeEphemeris(
+                        other.to_string(),
+                    ));
+                }
             };
             return Ok(true);
         }
@@ -382,27 +380,35 @@ impl Parfile {
         // Binary model
         if "MODEL" == key {
             if self.binary_model != BinaryModel::Unstated {
-                return Err(PsruError::ParRepeatParam(String::from("MODEL")))
+                return Err(PsruError::ParRepeatParam(String::from("MODEL")));
             }
             self.binary_model = match value {
                 "BT" => BinaryModel::BT,
                 "DD" => BinaryModel::DD,
                 "ELL1" => BinaryModel::ELL1,
                 "MSS" => BinaryModel::MSS,
-                other => return Err(PsruError::UnknownBinaryModel(other.to_string()))
+                other => {
+                    return Err(PsruError::UnknownBinaryModel(
+                        other.to_string(),
+                    ));
+                }
             };
             return Ok(true);
         }
 
-        // Method for transforming from terrestrial to celestial frame 
+        // Method for transforming from terrestrial to celestial frame
         if "T2CMETHOD" == key {
             if self.t2c_method != T2CMethod::Unstated {
-                return Err(PsruError::ParRepeatParam(String::from("T2CMETHOD")))
+                return Err(PsruError::ParRepeatParam(String::from(
+                    "T2CMETHOD",
+                )));
             }
             self.t2c_method = match value {
                 "TEMPO" => T2CMethod::TEMPO,
                 "IAU2000B" => T2CMethod::IAU2000B,
-                other => return Err(PsruError::UnknownT2CMethod(other.to_string()))
+                other => {
+                    return Err(PsruError::UnknownT2CMethod(other.to_string()));
+                }
             };
             return Ok(true);
         }
@@ -410,38 +416,40 @@ impl Parfile {
         // Units
         if "UNITS" == key {
             if self.units != Units::Unstated {
-                return Err(PsruError::ParRepeatParam(String::from("UNITS")))
+                return Err(PsruError::ParRepeatParam(String::from("UNITS")));
             }
             self.units = match value {
                 "SI" => Units::SI,
                 "TCB" => Units::TCB,
                 "TDB" => Units::TDB,
-                other => return Err(PsruError::UnknownUnits(other.to_string()))
+                other => {
+                    return Err(PsruError::UnknownUnits(other.to_string()));
+                }
             };
             return Ok(true);
         }
 
         if "MODE" == key {
             if self.error_mode != ErrorMode::Unstated {
-                return Err(PsruError::ParRepeatParam(String::from("MODE")))
+                return Err(PsruError::ParRepeatParam(String::from("MODE")));
             }
             self.error_mode = match value {
                 "0" => ErrorMode::Mode0,
                 "1" => ErrorMode::Mode1,
-                other => return Err(PsruError::UnknownErrorMode(other.to_string()))
+                other => {
+                    return Err(PsruError::UnknownErrorMode(other.to_string()));
+                }
             };
             return Ok(true);
         }
 
         Ok(false)
     }
-    
+
     /// Performs a little check to see everything's ok.
     fn check(&self) -> Result<(), PsruError> {
         // Check mandatory params
-        if !self.texts
-            .iter()
-            .any(|t| t.name() == "PSR") {
+        if !self.texts.iter().any(|t| t.name() == "PSR") {
             return Err(PsruError::ParNoName);
         }
         self.parameters
@@ -449,28 +457,42 @@ impl Parfile {
             .find(|t| t.name() == "PEPOCH")
             .map_or_else(
                 || Err(PsruError::ParNoPEpoch),
-                |p| if match *p.value() {
-                    FittedParameterValue::Missing => false,
-                    FittedParameterValue::JustValue(value) |
-                    FittedParameterValue::FitInfo { value, .. } => value > 0.0,
-                }{ Ok(()) } else { Err(PsruError::ParBadPEpoch) }
+                |p| {
+                    if match *p.value() {
+                        FittedParameterValue::Missing => false,
+                        FittedParameterValue::JustValue(value)
+                        | FittedParameterValue::FitInfo { value, .. } => {
+                            value > 0.0
+                        }
+                    } {
+                        Ok(())
+                    } else {
+                        Err(PsruError::ParBadPEpoch)
+                    }
+                },
             )?;
-        
+
         self.parameters
             .iter()
             .find(|t| t.name() == "F0")
             .map_or_else(
                 || Err(PsruError::ParNoFrequency),
-                |p| if match *p.value() {
-                    FittedParameterValue::Missing => false,
-                    FittedParameterValue::JustValue(value) |
-                    FittedParameterValue::FitInfo { value, .. } => value > 0.0,
-                } { Ok(()) } else { Err(PsruError::ParBadFrequency) }
+                |p| {
+                    if match *p.value() {
+                        FittedParameterValue::Missing => false,
+                        FittedParameterValue::JustValue(value)
+                        | FittedParameterValue::FitInfo { value, .. } => {
+                            value > 0.0
+                        }
+                    } {
+                        Ok(())
+                    } else {
+                        Err(PsruError::ParBadFrequency)
+                    }
+                },
             )?;
 
-        if !self.parameters
-            .iter()
-            .any(|t| t.name() == "DM") {
+        if !self.parameters.iter().any(|t| t.name() == "DM") {
             return Err(PsruError::ParNoDispersion);
         }
 
@@ -480,10 +502,13 @@ impl Parfile {
             return Err(PsruError::ParDuplicateParameters(
                 p64dupes
                     .into_iter()
-                    .map(|(i, j)| (
-                        self.parameters[i].to_string(),
-                        self.parameters[j].to_string(),
-                    )).collect()
+                    .map(|(i, j)| {
+                        (
+                            self.parameters[i].to_string(),
+                            self.parameters[j].to_string(),
+                        )
+                    })
+                    .collect(),
             ));
         }
         let ptdupes = find_duplicates(&self.texts);
@@ -491,10 +516,13 @@ impl Parfile {
             return Err(PsruError::ParDuplicateParameters(
                 ptdupes
                     .into_iter()
-                    .map(|(i, j)| (
-                        self.parameters[i].to_string(),
-                        self.parameters[j].to_string(),
-                    )).collect()
+                    .map(|(i, j)| {
+                        (
+                            self.parameters[i].to_string(),
+                            self.parameters[j].to_string(),
+                        )
+                    })
+                    .collect(),
             ));
         }
         let fdupes = find_duplicates(&self.flags);
@@ -502,10 +530,13 @@ impl Parfile {
             return Err(PsruError::ParDuplicateParameters(
                 fdupes
                     .into_iter()
-                    .map(|(i, j)| (
-                        self.parameters[i].name().to_string(),
-                        self.parameters[j].name().to_string(),
-                    )).collect()
+                    .map(|(i, j)| {
+                        (
+                            self.parameters[i].name().to_string(),
+                            self.parameters[j].name().to_string(),
+                        )
+                    })
+                    .collect(),
             ));
         }
 
@@ -522,10 +553,12 @@ fn find_duplicates<T>(params: &[Parameter<T>]) -> Vec<(usize, usize)> {
     params
         .iter()
         .enumerate()
-        .filter_map(|(i, p1)| params[i+1..]
-            .iter()
-            .enumerate()
-            .find(|(_, p2)| p1.name() == p2.name())
-            .map(|(j, _)| (i, j))
-        ).collect()
+        .filter_map(|(i, p1)| {
+            params[i + 1..]
+                .iter()
+                .enumerate()
+                .find(|(_, p2)| p1.name() == p2.name())
+                .map(|(j, _)| (i, j))
+        })
+        .collect()
 }

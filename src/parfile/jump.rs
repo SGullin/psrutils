@@ -1,6 +1,6 @@
 use super::PsruError;
-use crate::parse_tools::parse_f64;
 use crate::parse_tools::parse_bool;
+use crate::parse_tools::parse_f64;
 
 /// Add a constant oﬀset between specified TOAs.
 #[derive(Debug)]
@@ -24,12 +24,12 @@ pub enum JumpType {
     Flag(String, String),
 }
 
-impl Jump {    
-    /// This will parse a jump, which are written on one line. If anything is 
+impl Jump {
+    /// This will parse a jump, which are written on one line. If anything is
     /// missing or malformed, an error is returned.
     pub(crate) fn parse(
-        parts: &[&str], 
-        jumps: &mut Vec<Self>
+        parts: &[&str],
+        jumps: &mut Vec<Self>,
     ) -> Result<bool, PsruError> {
         if parts[0] != "JUMP" {
             return Ok(false);
@@ -52,11 +52,15 @@ impl Jump {
                 parse_f64(parts.next().ok_or_else(error)?)?,
                 parse_f64(parts.next().ok_or_else(error)?)?,
             ),
-            "TEL" => JumpType::Tel((*parts.next().ok_or_else(error)?).to_string()),
-            "NAME" => JumpType::Name((*parts.next().ok_or_else(error)?).to_string()),
-            
+            "TEL" => {
+                JumpType::Tel((*parts.next().ok_or_else(error)?).to_string())
+            }
+            "NAME" => {
+                JumpType::Name((*parts.next().ok_or_else(error)?).to_string())
+            }
+
             flag => JumpType::Flag(
-                flag.to_string(), 
+                flag.to_string(),
                 (*parts.next().ok_or_else(error)?).to_string(),
             ),
         };
@@ -70,7 +74,7 @@ impl Jump {
 
         Ok(true)
     }
-    
+
     pub(crate) fn write(&self) -> String {
         let mut line = String::from("JUMP");
         match &self.jtype {
@@ -81,7 +85,8 @@ impl Jump {
             JumpType::Flag(f, v) => line += &format!("{f} {v}"),
         }
 
-        line += &format!(" {} {}", self.value, if self.fit {"1"} else {"0"});
+        line +=
+            &format!(" {} {}", self.value, if self.fit { "1" } else { "0" });
 
         line
     }

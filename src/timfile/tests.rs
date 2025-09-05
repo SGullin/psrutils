@@ -1,30 +1,26 @@
 #[allow(unused)]
-use std::io::{BufReader, LineWriter};
-#[allow(unused)]
 use super::*;
+#[allow(unused)]
+use std::io::{BufReader, LineWriter};
 
 #[allow(unused)]
-const T2_MINIMAL: &[&str] = &[
-    "dir/file.ext",
-    "999.999",
-    "55000.97531",
-    "99.11",
-    "tele-id",
-];
+const T2_MINIMAL: &[&str] =
+    &["dir/file.ext", "999.999", "55000.97531", "99.11", "tele-id"];
 
 #[test]
 fn t2_incomplete() {
-    for i in 0..T2_MINIMAL.len() { 
+    for i in 0..T2_MINIMAL.len() {
         let line = T2_MINIMAL
             .iter()
             .enumerate()
-            .filter(|(j,_)| i != *j)
+            .filter(|(j, _)| i != *j)
             .map(|a| *a.1)
             .collect::<Vec<_>>();
-        
+
         assert!(
-            TOAInfo::parse_tempo2(&line).is_err(), 
-            "'{}' should fail", line.join(" "),
+            TOAInfo::parse_tempo2(&line).is_err(),
+            "'{}' should fail",
+            line.join(" "),
         );
     }
 }
@@ -34,7 +30,7 @@ fn t2_minimal() {
 }
 #[test]
 fn t2_bad() {
-    TOAInfo::parse_tempo2(&[&["C"],T2_MINIMAL].concat()).unwrap();
+    TOAInfo::parse_tempo2(&[&["C"], T2_MINIMAL].concat()).unwrap();
 }
 #[test]
 fn t2_comments() {

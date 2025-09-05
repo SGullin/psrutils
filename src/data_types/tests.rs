@@ -24,12 +24,12 @@ fn ra_dec_coords() {
         "0:0:0",
     ] {
         let c = ra.parse::<J2000Ra>();
-        if let Err(err) = c { 
+        if let Err(err) = c {
             panic!("{err}\n{ra} should be ok as ra");
         }
     }
 
-    for dec in [    
+    for dec in [
         "59:59.999",
         "0:59:",
         "90:59:59.999",
@@ -60,4 +60,13 @@ fn ra_dec_coords() {
             panic!("{err}\n{dec} should be ok as dec");
         }
     }
+}
+
+#[test]
+fn mjd() {
+    let mjd = "560664.501544124612235".parse::<Mjd>().unwrap();
+    assert_eq!(mjd, Mjd::new(560664, 0.501544124612235), "Int+frac failed");
+
+    let mjd = "560664".parse::<Mjd>().unwrap();
+    assert_eq!(mjd, Mjd::new(560664, 0.0), "Int failed");
 }

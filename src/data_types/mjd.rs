@@ -18,9 +18,9 @@ impl FromStr for Mjd {
     type Err = PsruError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let err = |s: &str| PsruError::Unparsable { 
-            value: s.to_string(), 
-            to_type: "MJD" 
+        let err = |s: &str| PsruError::Unparsable {
+            value: s.to_string(),
+            to_type: "MJD",
         };
 
         let parts = s.split('.').collect::<Vec<_>>();
@@ -29,14 +29,14 @@ impl FromStr for Mjd {
                 int: parts[0].parse().map_err(|_| err(s))?,
                 frac: 0.0,
             })
-        }
-        else if parts.len() == 2 {
+        } else if parts.len() == 2 {
             Ok(Self {
                 int: parts[0].parse().map_err(|_| err(s))?,
-                frac: parts[1].parse().map_err(|_| err(s))?,
+                frac: (String::from("0.") + parts[1])
+                    .parse()
+                    .map_err(|_| err(s))?,
             })
-        }
-        else {
+        } else {
             Err(err(s))
         }
     }
@@ -48,10 +48,7 @@ impl Mjd {
         assert!(frac < 1.0);
         assert!(frac >= 0.0);
 
-        Self {
-            int,
-            frac
-        }
+        Self { int, frac }
     }
 
     /// Converts the value into a pure `f64`.
